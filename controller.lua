@@ -1,6 +1,6 @@
--- ========================
--- DOOR SYSTEM - CONTROLLER
--- ========================
+-- ============================================================
+-- SCADA DOOR SYSTEM - CONTROLLER MAIN ENGINE (STACK SHIELD v2.3)
+-- ============================================================
 
 local term = _G.term
 local colors = _G.colors
@@ -12,6 +12,7 @@ if config.modemSide and config.modemSide ~= "" then pcall(function() rednet.open
 local passModalOpen = false
 local enteredPass = ""
 
+-- Оперативная матрица активных мониторов
 local activeMonitors = {}
 
 local function drawPanel(x, y, w, h, title, borderCol)
@@ -26,28 +27,27 @@ local function drawPanel(x, y, w, h, title, borderCol)
     end
 end
 
+-- Безопасная отрисовка кнопки на мониторе
 local function renderSingleMonitor(monSide, active)
-    local m = peripheral.wrap(monSide)
-    if m then
+    -- Проверяем имя перед тем как оборачивать периферию
+    if not monSide or not string.find(monSide:lower(), "monitor") then return end
+    
+    local ok, m = pcall(peripheral.wrap, monSide)
+    if ok and m then
         pcall(function() m.setTextScale(1) end)
-        
         m.setBackgroundColor(active and colors.green or colors.black)
         m.setTextColor(active and colors.black or colors.lime)
         m.clear()
         
         local w, h = m.getSize()
-        
         local txt = "[   OPEN GATE   ]"
         if w < #txt then
             txt = "[ OPEN ]"
-            if w < #txt then
-                txt = "OPEN"
-            end
+            if w < #txt then txt = "OPEN" end
         end
         
         local posX = math.floor((w - #txt) / 2) + 1
         local posY = math.floor(h / 2) + 1
-        
         if posX < 1 then posX = 1 end
         if posY < 1 then posY = 1 end
         
@@ -56,16 +56,22 @@ local function renderSingleMonitor(monSide, active)
     end
 end
 
+-- Обновление состояния всех подключенных мониторов
 local function renderAllMonitors(active)
     for monSide, _ in pairs(activeMonitors) do
         renderSingleMonitor(monSide, active)
     end
 end
 
+-- Безопасное сканирование сети при старте (Исключает stack overflow)
 local function initMonitors()
     activeMonitors = {}
-    for _, side in ipairs(peripheral.getNames()) do
-        if peripheral.getType(side) == "monitor" then
+    local ok, pList = pcall(peripheral.getNames)
+    if not ok or not pList then return end
+    
+    for _, side in ipairs(pList) do
+        -- Защита: смотрим только на имя, не вызывая тяжелый peripheral.getType()
+        if string.find(side:lower(), "monitor") then
             activeMonitors[side] = true
             renderSingleMonitor(side, false)
         end
@@ -95,6 +101,7 @@ local function drawConsoleUI()
     end
 end
 
+-- СИНХРОНИЗАЦИЯ С РЕСИВЕРОМ
 if not config.targetId then
     term.clear()
     drawPanel(2, 2, 48, 8, "ESTABLISHING TELEMETRY LINK", colors.lightBlue)
@@ -137,7 +144,7 @@ local function triggerDoorOpening()
 end
 
 parallel.waitForAny(
-    function()
+    function() -- Клавиатура терминала
         while true do
             local _, key = os.pullEvent("key")
             if key == keys.space and not passModalOpen then
@@ -160,14 +167,14 @@ parallel.waitForAny(
         end
     end,
     
-    function()
+    function() -- Текстовый буфер пароля
         while true do
             local _, char = os.pullEvent("char")
             if passModalOpen then enteredPass = enteredPass .. char; drawConsoleUI() end
         end
     end,
     
-    function()
+    function() -- Экранированный менеджер ивентов сети
         while true do
             local event, p1, p2, p3 = os.pullEvent()
             
@@ -181,7 +188,8 @@ parallel.waitForAny(
                 
             elseif event == "peripheral" then
                 local side = p1
-                if peripheral.getType(side) == "monitor" then
+                -- Защита: проверяем тип ТОЛЬКО если в имени устройства есть "monitor"
+                if side and string.find(side:lower(), "monitor") then
                     activeMonitors[side] = true
                     renderSingleMonitor(side, false)
                     drawConsoleUI()
@@ -189,7 +197,7 @@ parallel.waitForAny(
                 
             elseif event == "peripheral_detach" then
                 local side = p1
-                if activeMonitors[side] then
+                if side and activeMonitors[side] then
                     activeMonitors[side] = nil
                     drawConsoleUI()
                 end
