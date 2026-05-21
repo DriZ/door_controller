@@ -1,5 +1,5 @@
 -- ============================================================
--- SCADA DOOR SYSTEM - CONTROLLER MAIN ENGINE (STACK SHIELD v2.3)
+-- SCADA DOOR SYSTEM - CONTROLLER MAIN ENGINE (CONFIG SHIELD v2.4)
 -- ============================================================
 
 local term = _G.term
@@ -27,24 +27,18 @@ local function drawPanel(x, y, w, h, title, borderCol)
     end
 end
 
--- Безопасная и адаптивная отрисовка кнопки на мониторах любого размера
+-- Безопасная и адаптивная отрисовка кнопки на мониторах
 local function renderSingleMonitor(monSide, active)
-    if not monSide then return end
+    if not monSide or not string.find(monSide:lower(), "monitor") then return end
     
     local ok, m = pcall(peripheral.wrap, monSide)
     if ok and m then
         local w, h = m.getSize()
-        
         pcall(function()
-            if w > 30 or h > 15 then
-                m.setTextScale(2) -- Для больших экранов
-            else
-                m.setTextScale(1) -- Для мелких 1х1
-            end
+            if w > 30 or h > 15 then m.setTextScale(2) else m.setTextScale(1) end
         end)
         
         w, h = m.getSize()
-        
         m.setBackgroundColor(active and colors.green or colors.black)
         m.setTextColor(active and colors.black or colors.lime)
         m.clear()
@@ -57,7 +51,6 @@ local function renderSingleMonitor(monSide, active)
         
         local posX = math.floor((w - #txt) / 2) + 1
         local posY = math.floor(h / 2) + 1
-        
         if posX < 1 then posX = 1 end
         if posY < 1 then posY = 1 end
         
@@ -66,25 +59,21 @@ local function renderSingleMonitor(monSide, active)
     end
 end
 
--- Обновление состояния всех подключенных мониторов
 local function renderAllMonitors(active)
     for monSide, _ in pairs(activeMonitors) do
         renderSingleMonitor(monSide, active)
     end
 end
 
--- Безопасная проверка: действительно ли устройство является монитором
+-- Безопасная проверка типа
 local function isMonitor(side)
     if not side then return false end
-    -- Если в имени уже есть "monitor" (через модем), это точно он
     if string.find(side:lower(), "monitor") then return true end
-    
-    -- Если имя - это просто сторона (right, top и т.д.), аккуратно проверяем тип
     local ok, pType = pcall(peripheral.getType, side)
     return ok and pType == "monitor"
 end
 
--- Надежное сканирование сети при старте
+-- Сканирование сети при старте
 local function initMonitors()
     activeMonitors = {}
     local ok, pList = pcall(peripheral.getNames)
@@ -102,7 +91,7 @@ local function drawConsoleUI()
     term.setBackgroundColor(colors.black)
     term.clear()
     drawPanel(2, 2, 48, 16, "ACCESS CONTROL PANEL DEPLOYED", colors.lime)
-    term.setCursorPos(4, 4) term.setTextColor(colors.white) term.write("Sector Domain: " .. config.roomName:upper())
+    term.setCursorPos(4, 4) term.setTextColor(colors.white) term.write("Sector Domain: " .. (config.roomName or "UNNAMED SECTOR"):upper())
     term.setCursorPos(4, 5) term.write("Uplink Address Node: " .. (config.targetId or "RESOLVING MATRIX..."))
     
     local monCount = 0
@@ -121,7 +110,9 @@ local function drawConsoleUI()
     end
 end
 
--- СИНХРОНИЗАЦИЯ С РЕСИВЕРОМ
+-- ============================================================
+-- ИСПРАВЛЕННЫЙ БЛОК СИНХРОНИЗАЦИИ (БЕЗ РЕКУРСИИ ДОФАЙЛА)
+-- ============================================================
 if not config.targetId then
     term.clear()
     drawPanel(2, 2, 48, 8, "ESTABLISHING TELEMETRY LINK", colors.lightBlue)
@@ -133,14 +124,24 @@ if not config.targetId then
             if rid then
                 rednet.send(sid, "confirm:" .. rid)
                 config.targetId = sid
+                
+                -- Полная перезапись структуры таблицы в виде чистого текста
                 local f = fs.open("door/config.lua", "w")
-                f.write("local c = dofile('door/config.lua')\nc.targetId = " .. sid .. "\nreturn c")
+                f.writeLine("return {")
+                f.writeLine("  profile = \"" .. (config.profile or "CONTROLLER") .. "\",")
+                f.writeLine("  roomName = \"" .. (config.roomName or "Gate Sector") .. "\",")
+                f.writeLine("  modemSide = \"" .. (config.modemSide or "top") .. "\",")
+                f.writeLine("  usePassword = " .. tostring(config.usePassword or false) .. ",")
+                f.writeLine("  correctPassword = \"" .. (config.correctPassword or "1234") .. "\",")
+                f.writeLine("  targetId = " .. sid)
+                f.writeLine("}")
                 f.close()
                 break
             end
         end
     end
 end
+-- ============================================================
 
 initMonitors()
 drawConsoleUI()
@@ -164,7 +165,7 @@ local function triggerDoorOpening()
 end
 
 parallel.waitForAny(
-    function()
+    function() -- Клавиатура терминала
         while true do
             local _, key = os.pullEvent("key")
             if key == keys.space and not passModalOpen then
@@ -187,14 +188,14 @@ parallel.waitForAny(
         end
     end,
     
-    function()
+    function() -- Текстовый буфер пароля
         while true do
             local _, char = os.pullEvent("char")
             if passModalOpen then enteredPass = enteredPass .. char; drawConsoleUI() end
         end
     end,
     
-    function()
+    function() -- Менеджер ивентов сети
         while true do
             local event, p1, p2, p3 = os.pullEvent()
             
