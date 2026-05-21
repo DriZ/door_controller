@@ -151,18 +151,28 @@ drawConsoleUI()
 
 local function triggerDoorOpening()
     renderAllMonitors(true)
+    
     rednet.send(config.targetId, "open")
     term.setCursorPos(4, 15) term.setTextColor(colors.green) term.write("[TRANSMITTING] VECTOR ACTION ACTIVE.      ")
     
-    local timer = os.startTimer(6)
+    local myTimer = os.startTimer(6)
+    
     while true do
-        local _, id, msg = os.pullEvent()
-        if id == timer then break end
-        if id == "rednet_message" and msg == "done" then
+        local event, p1, p2 = os.pullEvent()
+        
+        if event == "timer" and p1 == myTimer then
+            term.setCursorPos(4, 15) term.setTextColor(colors.yellow) term.write("[TIMEOUT] NO RESPONSE FROM ACTUATOR.    ")
+            break
+        end
+        
+        if event == "rednet_message" and p2 == "done" and p1 == config.targetId then
             term.setCursorPos(4, 15) term.setTextColor(colors.lime) term.write("[CONFIRMED] TARGET SECTOR CYCLED.       ")
             break
         end
     end
+    
+    sleep(0.5)
+    
     renderAllMonitors(false)
     drawConsoleUI()
 end
