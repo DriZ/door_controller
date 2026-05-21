@@ -1,6 +1,6 @@
--- ============================================================
--- SCADA DOOR SYSTEM - CONTROLLER MAIN ENGINE (TOGGLE UPDATE v2.6)
--- ============================================================
+-- ===========================================================
+-- GATEKEEPER OS - CONTROLLER MAIN ENGINE (TOGGLE UPDATE v2.6)
+-- ===========================================================
 
 local term = _G.term
 local colors = _G.colors
@@ -11,9 +11,8 @@ if config.modemSide and config.modemSide ~= "" then pcall(function() rednet.open
 
 local passModalOpen = false
 local enteredPass = ""
-local isDoorOpen = false -- Оперативный статус ворот (для режима рычага)
+local isDoorOpen = false
 
--- Оперативная матрица активных мониторов
 local activeMonitors = {}
 
 local function drawPanel(x, y, w, h, title, borderCol)
@@ -38,7 +37,6 @@ local function setupMonitorScale(monSide)
     end
 end
 
--- Адаптивная отрисовка кнопки (теперь поддерживает динамический текст OPEN / CLOSE)
 local function renderSingleMonitor(monSide, active)
     if not monSide then return end
     
@@ -50,7 +48,6 @@ local function renderSingleMonitor(monSide, active)
         m.setTextColor(active and colors.black or colors.lime)
         m.clear()
         
-        -- Выбор текста в зависимости от состояния шлюза
         local txt = active and "[   CLOSE GATE  ]" or "[   OPEN GATE   ]"
         if w < #txt then
             txt = active and "[ CLOSE ]" or "[ OPEN ]"
@@ -87,9 +84,16 @@ local function initMonitors()
     
     for _, side in ipairs(pList) do
         if isMonitor(side) then
-            activeMonitors[side] = true
-            setupMonitorScale(side)
-            renderSingleMonitor(side, isDoorOpen)
+            local isSelected = true
+            if config.selectedMonitors and next(config.selectedMonitors) ~= nil then
+                isSelected = config.selectedMonitors[side] or false
+            end
+            
+            if isSelected then
+                activeMonitors[side] = true
+                setupMonitorScale(side)
+                renderSingleMonitor(side, isDoorOpen)
+            end
         end
     end
 end
@@ -105,7 +109,6 @@ local function drawConsoleUI()
     for _ in pairs(activeMonitors) do monCount = monCount + 1 end
     term.setCursorPos(4, 6) term.setTextColor(colors.lightBlue) term.write("Active Display Panels: " .. monCount)
     
-    -- Вывод текущего режима работы
     term.setCursorPos(4, 7)
     if (config.openDelay or 4) == 0 then
         term.setTextColor(colors.yellow) term.write("Drive Mode: TOGGLE SWITCH (LEVER)")
@@ -125,7 +128,6 @@ local function drawConsoleUI()
     end
 end
 
--- СИНХРОНИЗАЦИЯ С РЕСИВЕРОМ
 if not config.targetId then
     term.clear()
     drawPanel(2, 2, 48, 8, "ESTABLISHING TELEMETRY LINK", colors.lightBlue)
@@ -158,12 +160,10 @@ end
 initMonitors()
 drawConsoleUI()
 
--- УПРАВЛЕНИЕ ЦИКЛОМ ДВЕРИ (ТАЙМЕР ИЛИ РЫЧАГ)
 local function triggerDoorOpening()
     local delay = config.openDelay or 4
     
     if delay == 0 then
-        -- РЕЖИМ РЫЧАГА (TOGGLE MODE)
         isDoorOpen = not isDoorOpen
         renderAllMonitors(isDoorOpen)
         
@@ -177,7 +177,6 @@ local function triggerDoorOpening()
         sleep(0.5)
         drawConsoleUI()
     else
-        -- СТАНДАРТНЫЙ РЕЖИМ С ТАЙМЕРОМ
         renderAllMonitors(true)
         rednet.send(config.targetId, "open:" .. delay)
         term.setCursorPos(4, 16) term.setTextColor(colors.green) term.write("[TRANSMITTING] VECTOR ACTION ACTIVE.      ")
@@ -201,7 +200,7 @@ local function triggerDoorOpening()
 end
 
 parallel.waitForAny(
-    function() -- Клавиатура терминала
+    function()
         while true do
             local _, key = os.pullEvent("key")
             if key == keys.space and not passModalOpen then
@@ -224,14 +223,14 @@ parallel.waitForAny(
         end
     end,
     
-    function() -- Текстовый буфер пароля
+    function()
         while true do
             local _, char = os.pullEvent("char")
             if passModalOpen then enteredPass = enteredPass .. char; drawConsoleUI() end
         end
     end,
     
-    function() -- Менеджер ивентов сети
+    function()
         while true do
             local event, p1, p2, p3 = os.pullEvent()
             
