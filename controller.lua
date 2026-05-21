@@ -12,7 +12,6 @@ if config.modemSide and config.modemSide ~= "" then pcall(function() rednet.open
 local passModalOpen = false
 local enteredPass = ""
 
--- Оперативная матрица активных мониторов
 local activeMonitors = {}
 
 local function drawPanel(x, y, w, h, title, borderCol)
@@ -27,18 +26,27 @@ local function drawPanel(x, y, w, h, title, borderCol)
     end
 end
 
--- Безопасная и адаптивная отрисовка кнопки на мониторах
-local function renderSingleMonitor(monSide, active)
-    if not monSide or not string.find(monSide:lower(), "monitor") then return end
-    
+local function setupMonitorScale(monSide)
     local ok, m = pcall(peripheral.wrap, monSide)
     if ok and m then
         local w, h = m.getSize()
         pcall(function()
-            if w > 30 or h > 15 then m.setTextScale(2) else m.setTextScale(1) end
+            if w > 30 or h > 15 then 
+                m.setTextScale(2) 
+            else 
+                m.setTextScale(1) 
+            end
         end)
+    end
+end
+
+local function renderSingleMonitor(monSide, active)
+    if not monSide then return end
+    
+    local ok, m = pcall(peripheral.wrap, monSide)
+    if ok and m then
+        local w, h = m.getSize()
         
-        w, h = m.getSize()
         m.setBackgroundColor(active and colors.green or colors.black)
         m.setTextColor(active and colors.black or colors.lime)
         m.clear()
@@ -65,7 +73,6 @@ local function renderAllMonitors(active)
     end
 end
 
--- Безопасная проверка типа
 local function isMonitor(side)
     if not side then return false end
     if string.find(side:lower(), "monitor") then return true end
@@ -73,7 +80,6 @@ local function isMonitor(side)
     return ok and pType == "monitor"
 end
 
--- Сканирование сети при старте
 local function initMonitors()
     activeMonitors = {}
     local ok, pList = pcall(peripheral.getNames)
@@ -82,6 +88,7 @@ local function initMonitors()
     for _, side in ipairs(pList) do
         if isMonitor(side) then
             activeMonitors[side] = true
+            setupMonitorScale(side)
             renderSingleMonitor(side, false)
         end
     end
@@ -110,9 +117,6 @@ local function drawConsoleUI()
     end
 end
 
--- ============================================================
--- ИСПРАВЛЕННЫЙ БЛОК СИНХРОНИЗАЦИИ (БЕЗ РЕКУРСИИ ДОФАЙЛА)
--- ============================================================
 if not config.targetId then
     term.clear()
     drawPanel(2, 2, 48, 8, "ESTABLISHING TELEMETRY LINK", colors.lightBlue)
@@ -125,7 +129,6 @@ if not config.targetId then
                 rednet.send(sid, "confirm:" .. rid)
                 config.targetId = sid
                 
-                -- Полная перезапись структуры таблицы в виде чистого текста
                 local f = fs.open("door/config.lua", "w")
                 f.writeLine("return {")
                 f.writeLine("  profile = \"" .. (config.profile or "CONTROLLER") .. "\",")
@@ -165,7 +168,7 @@ local function triggerDoorOpening()
 end
 
 parallel.waitForAny(
-    function() -- Клавиатура терминала
+    function()
         while true do
             local _, key = os.pullEvent("key")
             if key == keys.space and not passModalOpen then
