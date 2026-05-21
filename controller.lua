@@ -27,19 +27,28 @@ local function drawPanel(x, y, w, h, title, borderCol)
     end
 end
 
--- Безопасная отрисовка кнопки на мониторе
+-- Безопасная и адаптивная отрисовка кнопки на мониторах любого размера
 local function renderSingleMonitor(monSide, active)
-    -- Проверяем имя перед тем как оборачивать периферию
-    if not monSide or not string.find(monSide:lower(), "monitor") then return end
+    if not monSide then return end
     
     local ok, m = pcall(peripheral.wrap, monSide)
     if ok and m then
-        pcall(function() m.setTextScale(1) end)
+        local w, h = m.getSize()
+        
+        pcall(function()
+            if w > 30 or h > 15 then
+                m.setTextScale(2) -- Для больших экранов
+            else
+                m.setTextScale(1) -- Для мелких 1х1
+            end
+        end)
+        
+        w, h = m.getSize()
+        
         m.setBackgroundColor(active and colors.green or colors.black)
         m.setTextColor(active and colors.black or colors.lime)
         m.clear()
         
-        local w, h = m.getSize()
         local txt = "[   OPEN GATE   ]"
         if w < #txt then
             txt = "[ OPEN ]"
@@ -48,6 +57,7 @@ local function renderSingleMonitor(monSide, active)
         
         local posX = math.floor((w - #txt) / 2) + 1
         local posY = math.floor(h / 2) + 1
+        
         if posX < 1 then posX = 1 end
         if posY < 1 then posY = 1 end
         
