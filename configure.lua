@@ -78,7 +78,7 @@ else
 end
 
 -- Создаём главное окно интерфейса
-local mainFrame = basalt.createFrame():setBackground(colors.black)
+local mainFrame = basalt.createFrame():setBackground(colors.darkGray)
 
 -- Заголовок системы
 mainFrame:addLabel()
