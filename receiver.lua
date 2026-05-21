@@ -76,16 +76,34 @@ local function mainLifecycle()
         term.setCursorPos(4, 4) term.setTextColor(colors.white) term.write("Authorized Control Unit ID: " .. tostring(config.controllerId))
         term.setCursorPos(4, 5) term.write("Actuator Connection Bus: " .. config.doorSide:upper())
         
-        term.setCursorPos(4, 8) term.setTextColor(colors.gray) term.write("[ SYSTEM STATUS ] Idle. Monitoring matrix...")
+        local rsStatus = redstone.getOutput(config.doorSide)
+        term.setCursorPos(4, 8)
+        if rsStatus then
+            term.setTextColor(colors.lime) term.write("[ METRIC ] OUTPUT BUS ACTIVE (POWER ON)  ")
+        else
+            term.setTextColor(colors.gray) term.write("[ SYSTEM STATUS ] Idle. Monitoring matrix...")
+        end
+        
         term.setCursorPos(4, 11) term.setTextColor(colors.yellow) term.write("[ PRESS SPACEBAR ] To unbind and reset link")
         
         local sid, msg = rednet.receive()
-        if sid == config.controllerId and msg == "open" then
-            term.setCursorPos(4, 8) term.setTextColor(colors.lime) term.write("[ ENGAGED ] INJECTING ENERGY INTO ACTUATORS  ")
-            redstone.setOutput(config.doorSide, true)
-            sleep(4)
-            redstone.setOutput(config.doorSide, false)
-            rednet.send(sid, "done")
+        if sid == config.controllerId then
+            if msg == "open:toggle" then
+                redstone.setOutput(config.doorSide, true)
+                
+            elseif msg == "close" then
+                redstone.setOutput(config.doorSide, false)
+                
+            elseif string.find(msg, "^open") then
+                local customDelay = msg:match("^open:(%d+)$")
+                local sleepTime = customDelay and tonumber(customDelay) or 4
+                
+                term.setCursorPos(4, 8) term.setTextColor(colors.lime) term.write("[ ENGAGED ] INJECTING ENERGY INTO ACTUATORS  ")
+                redstone.setOutput(config.doorSide, true)
+                sleep(sleepTime)
+                redstone.setOutput(config.doorSide, false)
+                rednet.send(sid, "done")
+            end
         end
     end
 end

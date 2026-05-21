@@ -1,161 +1,142 @@
--- ===================================
--- DOOR SYSTEM - HARDWARE CONFIGURATOR
--- ===================================
+-- ============================================================
+-- DOOR SYSTEM - HARDWARE CONFIGURATOR WIZARD (v2.7)
+-- ============================================================
 
 local term = _G.term
 local colors = _G.colors
-local keys = _G.keys
 
-if not fs.exists("door/config.lua") then
-    term.setTextColor(colors.red)
-    print("Configurator Error: Missing profile token!")
-    return
-end
-local config = dofile("door/config.lua")
-
-local function getPeripheralSides(pType)
-    local results = {}
-    for _, side in ipairs(peripheral.getNames()) do
-        if peripheral.getType(side) == pType then table.insert(results, side) end
-    end
-    return results
+local config = {}
+if fs.exists("door/config.lua") then
+    local ok, res = pcall(dofile, "door/config.lua")
+    if ok and type(res) == "table" then config = res end
 end
 
--- Автоопределение сетевого и беспроводного оборудования
-local modems = getPeripheralSides("modem")
-if #modems > 0 then config.modemSide = modems[1] else config.modemSide = "left" end
-
-local monitors = getPeripheralSides("monitor")
-local selectedMonitors = {}
-local cursorIdx = 1
-
-local function drawHeader(title)
-    term.setBackgroundColor(colors.gray)
-    term.setTextColor(colors.white)
-    term.clear()
-    term.setCursorPos(2, 2)
-    term.write("SCADA DESIGNER // " .. config.profile .. " SETUP")
+local function drawUI(title)
     term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.cyan)
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("===============================================")
+    print("     DOOR SYSTEM - CONFIGURATION WIZARD        ")
+    print("===============================================")
+    if title then print(" STEP: " .. title) print("--------------------------------------------------") end
 end
 
-local function saveFullConfig()
+drawUI("NODE PROFILE IDENTIFICATION")
+local profile = config.profile
+if not profile then
+    print("Select physical profile for this node:")
+    print("1. CONTROLLER (Main Panel & Displays)")
+    print("2. RECEIVER (Redstone Output Actuator)")
+    write("\nChoose option (1-2): ")
+    local pChoice = read()
+    profile = (pChoice == "2") and "RECEIVER" or "CONTROLLER"
+else
+    print("Detected active profile alignment: " .. profile)
+    sleep(1)
+end
+
+local newConfig = {
+    profile = profile,
+    targetId = config.targetId
+}
+
+if profile == "CONTROLLER" then
+    drawUI("SECTOR DOMAIN ASSIGNMENT")
+    write("Enter custom sector/room name (e.g. Gate Sector A):\n> ")
+    local name = read()
+    newConfig.roomName = (name ~= "") and name or (config.roomName or "Gate Sector A")
+
+    drawUI("NETWORK UPLINK BUS")
+    write("Enter modem peripheral side (top/bottom/left/right/back):\n> ")
+    local side = read()
+    newConfig.modemSide = (side ~= "") and side:lower() or (config.modemSide or "top")
+
+    drawUI("ACTUATOR DRIVE MODE")
+    print("Choose how the door should operate:")
+    print("1. [LEVER MODE]  - Toggle switch. Stays open until closed manually.")
+    print("2. [TIMED PULSE] - Automatically closes after a set delay.")
+    write("\nSelect operation mode (1-2): ")
+    local modeChoice = read()
+
+    if modeChoice == "1" then
+        newConfig.openDelay = 0
+        print("\n[+] Configured as Permanent Toggle Lever.")
+    else
+        write("\nEnter door open duration in seconds (e.g. 4):\n> ")
+        local delayInput = read()
+        local delayNum = tonumber(delayInput)
+        -- Защита: если ввели не число или меньше 1, ставим дефолт 4
+        if not delayNum or delayNum < 1 then delayNum = 4 end
+        newConfig.openDelay = delayNum
+        print("\n[+] Pulse timer locked at: " .. delayNum .. " seconds.")
+    end
+    sleep(1.5)
+
+    drawUI("SECURITY ENCRYPTION LAYER")
+    write("Enable cryptographic key protection? (y/n):\n> ")
+    local usePass = read():lower()
+    if usePass == "y" or usePass == "yes" then
+        newConfig.usePassword = true
+        write("Set master access password:\n> ")
+        local pass = read()
+        newConfig.correctPassword = (pass ~= "") and pass or (config.correctPassword or "1234")
+    else
+        newConfig.usePassword = false
+        newConfig.correctPassword = config.correctPassword or "1234"
+    end
+
     local f = fs.open("door/config.lua", "w")
-    f.write("return {\n")
-    f.write("  profile = \"" .. config.profile .. "\",\n")
-    f.write("  modemSide = \"" .. config.modemSide .. "\",\n")
-    f.write("  doorSide = \"" .. (config.doorSide or "bottom") .. "\",\n")
-    f.write("  roomName = \"" .. (config.roomName or "SECURE BLOCK") .. "\",\n")
-    f.write("  usePassword = " .. tostring(config.usePassword or false) .. ",\n")
-    f.write("  correctPassword = \"" .. (config.correctPassword or "") .. "\",\n")
-    f.write("  monitors = {\n")
-    for m, _ in pairs(selectedMonitors) do f.write("    [\"" .. m .. "\"] = true,\n") end
-    f.write("  }\n}")
+    f.writeLine("return {")
+    f.writeLine("  profile = \"" .. newConfig.profile .. "\",")
+    f.writeLine("  roomName = \"" .. newConfig.roomName .. "\",")
+    f.writeLine("  modemSide = \"" .. newConfig.modemSide .. "\",")
+    f.writeLine("  usePassword = " .. tostring(newConfig.usePassword) .. ",")
+    f.writeLine("  correctPassword = \"" .. newConfig.correctPassword .. "\",")
+    f.writeLine("  openDelay = " .. newConfig.openDelay .. ",")
+    if newConfig.targetId then
+        f.writeLine("  targetId = " .. newConfig.targetId)
+    else
+        f.writeLine("  targetId = nil")
+    end
+    f.writeLine("}")
+    f.close()
+
+else
+    drawUI("RECEIVER HARDWARE MAPPING")
+    write("Enter modem peripheral side (top/bottom/left/right/back):\n> ")
+    local mSide = read()
+    newConfig.modemSide = (mSide ~= "") and mSide:lower() or (config.modemSide or "left")
+
+    write("Enter redstone output side connected to the door:\n> ")
+    local dSide = read()
+    newConfig.doorSide = (dSide ~= "") and dSide:lower() or (config.doorSide or "bottom")
+
+    -- Запись конфигурации ресивера
+    local f = fs.open("door/config.lua", "w")
+    f.writeLine("return {")
+    f.writeLine("  profile = \"" .. newConfig.profile .. "\",")
+    f.writeLine("  modemSide = \"" .. newConfig.modemSide .. "\",")
+    f.writeLine("  doorSide = \"" .. newConfig.doorSide .. "\",")
+    if config.controllerId then
+        f.writeLine("  controllerId = " .. config.controllerId)
+    else
+        f.writeLine("  controllerId = nil")
+    end
+    f.writeLine("}")
     f.close()
 end
 
--- ФУНКЦИОНАЛ НАСТРОЙКИ РЕСИВЕРА
-local function configureReceiver()
-    local sides = {"top","bottom","left","right","front","back"}
-    while true do
-        drawHeader("RELAY INTERFACE")
-        term.setTextColor(colors.white)
-        term.setCursorPos(3, 5) term.write("Detected Modem Bus: " .. config.modemSide)
-        term.setCursorPos(3, 7) term.write("Select Redstone Output Node:")
-        
-        for i, s in ipairs(sides) do
-            if i == cursorIdx then
-                term.setTextColor(colors.lime)
-                term.setCursorPos(5, 8 + i) term.write("=> [ " .. s:upper() .. " ]")
-            else
-                term.setTextColor(colors.gray)
-                term.setCursorPos(5, 8 + i) term.write("   [ " .. s:upper() .. " ]")
-            end
-        end
-        term.setTextColor(colors.cyan)
-        term.setCursorPos(3, 16) term.write("[ENTER] Save Parameters & Open Uplink")
-        
-        local _, key = os.pullEvent("key")
-        if key == keys.up then cursorIdx = math.max(1, cursorIdx - 1)
-        elseif key == keys.down then cursorIdx = math.min(#sides, cursorIdx + 1)
-        elseif key == keys.enter then
-            config.doorSide = sides[cursorIdx]
-            saveFullConfig()
-            break
-        end
-    end
-end
+drawUI("CONFIGURATION LOCKED")
+term.setTextColor(colors.green)
+print("[+] Hardware matrix initialized successfully.")
+print("[+] System registry update deployed to /door/config.lua")
+print("--------------------------------------------------")
+write("Press Enter to boot main environment...")
+read()
 
--- ФУНКЦИОНАЛ НАСТРОЙКИ КОНТРОЛЛЕРА
-local function configureController()
-    local step = 1
-    while step <= 4 do
-        drawHeader("NETWORK MATRIX INTERFACE")
-        term.setTextColor(colors.white)
-        
-        if step == 1 then
-            term.setCursorPos(3, 5) term.write("Enter Access Sector / Room Name:")
-            term.setCursorPos(3, 7) term.setTextColor(colors.lime) term.write(">> ")
-            config.roomName = read()
-            step = 2
-        elseif step == 2 then
-            term.setCursorPos(3, 5) term.write("Select Display Outputs (Space to Check, Enter to Confirm):")
-            if #monitors == 0 then
-                term.setCursorPos(5, 7) term.setTextColor(colors.red) term.write("No external monitors found on the network.")
-            end
-            for i, m in ipairs(monitors) do
-                local chk = selectedMonitors[m] and "[X]" or "[ ]"
-                if i == cursorIdx then
-                    term.setTextColor(colors.lime)
-                    term.setCursorPos(5, 6 + i) term.write("=> " .. chk .. " Peripheral Matrix: " .. m)
-                else
-                    term.setTextColor(colors.gray)
-                    term.setCursorPos(5, 6 + i) term.write("   " .. chk .. " Peripheral Matrix: " .. m)
-                end
-            end
-            local _, key = os.pullEvent("key")
-            if key == keys.up then cursorIdx = math.max(1, cursorIdx - 1)
-            elseif key == keys.down then cursorIdx = math.min(#monitors, cursorIdx + 1)
-            elseif key == keys.space and #monitors > 0 then
-                selectedMonitors[monitors[cursorIdx]] = not selectedMonitors[monitors[cursorIdx]]
-            elseif key == keys.enter then
-                step = 3
-                cursorIdx = 1
-            end
-        elseif step == 3 then
-            term.setCursorPos(3, 5) term.write("Enforce Encryption Crypt-Key Password?")
-            term.setCursorPos(5, 7) if cursorIdx == 1 then term.setTextColor(colors.lime) term.write("=> [ YES ]") else term.setTextColor(colors.gray) term.write("   [ YES ]") end
-            term.setCursorPos(5, 8) if cursorIdx == 2 then term.setTextColor(colors.lime) term.write("=> [ NO ]") else term.setTextColor(colors.gray) term.write("   [ NO ]") end
-            
-            local _, key = os.pullEvent("key")
-            if key == keys.up or key == keys.down then cursorIdx = cursorIdx == 1 and 2 or 1
-            elseif key == keys.enter then
-                config.usePassword = (cursorIdx == 1)
-                if config.usePassword then step = 4 else step = 5 end
-            end
-        elseif step == 4 then
-            term.setCursorPos(3, 5) term.write("Input Terminal Access Password:")
-            term.setCursorPos(3, 7) term.setTextColor(colors.lime) term.write(">> ")
-            config.correctPassword = read("*")
-            step = 5
-        end
-    end
-    saveFullConfig()
-end
-
-if config.profile == "CONTROLLER" then configureController() else configureReceiver() end
-
-drawHeader("INITIALIZATION COMPLETION")
-term.setTextColor(colors.lime)
-term.setCursorPos(3, 6) term.write("[+] Local matrices compiled successfully.")
-term.setCursorPos(3, 9) term.setBackgroundColor(colors.green) term.setTextColor(colors.black)
-term.write("      [ ENTER ] BOOT MAIN SCADA LIFECYCLE       ")
-term.setBackgroundColor(colors.black)
-
-while true do
-    local _, key = os.pullEvent("key")
-    if key == keys.enter then
-        term.clear() term.setCursorPos(1,1)
-        if config.profile == "CONTROLLER" then shell.run("door/controller.lua") else shell.run("door/receiver.lua") end
-        break
-    end
+if profile == "CONTROLLER" then
+    shell.run("door/controller.lua")
+else
+    shell.run("door/receiver.lua")
 end

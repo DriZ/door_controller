@@ -1,5 +1,5 @@
 -- ============================================================
--- SCADA DOOR SYSTEM - CONTROLLER MAIN ENGINE (CONFIG SHIELD v2.4)
+-- SCADA DOOR SYSTEM - CONTROLLER MAIN ENGINE (TOGGLE UPDATE v2.6)
 -- ============================================================
 
 local term = _G.term
@@ -11,7 +11,9 @@ if config.modemSide and config.modemSide ~= "" then pcall(function() rednet.open
 
 local passModalOpen = false
 local enteredPass = ""
+local isDoorOpen = false -- Оперативный статус ворот (для режима рычага)
 
+-- Оперативная матрица активных мониторов
 local activeMonitors = {}
 
 local function drawPanel(x, y, w, h, title, borderCol)
@@ -31,15 +33,12 @@ local function setupMonitorScale(monSide)
     if ok and m then
         local w, h = m.getSize()
         pcall(function()
-            if w > 30 or h > 15 then 
-                m.setTextScale(2) 
-            else 
-                m.setTextScale(1) 
-            end
+            if w > 30 or h > 15 then m.setTextScale(2) else m.setTextScale(1) end
         end)
     end
 end
 
+-- Адаптивная отрисовка кнопки (теперь поддерживает динамический текст OPEN / CLOSE)
 local function renderSingleMonitor(monSide, active)
     if not monSide then return end
     
@@ -51,10 +50,11 @@ local function renderSingleMonitor(monSide, active)
         m.setTextColor(active and colors.black or colors.lime)
         m.clear()
         
-        local txt = "[   OPEN GATE   ]"
+        -- Выбор текста в зависимости от состояния шлюза
+        local txt = active and "[   CLOSE GATE  ]" or "[   OPEN GATE   ]"
         if w < #txt then
-            txt = "[ OPEN ]"
-            if w < #txt then txt = "OPEN" end
+            txt = active and "[ CLOSE ]" or "[ OPEN ]"
+            if w < #txt then txt = active and "CLOSE" or "OPEN" end
         end
         
         local posX = math.floor((w - #txt) / 2) + 1
@@ -89,7 +89,7 @@ local function initMonitors()
         if isMonitor(side) then
             activeMonitors[side] = true
             setupMonitorScale(side)
-            renderSingleMonitor(side, false)
+            renderSingleMonitor(side, isDoorOpen)
         end
     end
 end
@@ -105,18 +105,27 @@ local function drawConsoleUI()
     for _ in pairs(activeMonitors) do monCount = monCount + 1 end
     term.setCursorPos(4, 6) term.setTextColor(colors.lightBlue) term.write("Active Display Panels: " .. monCount)
     
-    term.setCursorPos(4, 9)
+    -- Вывод текущего режима работы
+    term.setCursorPos(4, 7)
+    if (config.openDelay or 4) == 0 then
+        term.setTextColor(colors.yellow) term.write("Drive Mode: TOGGLE SWITCH (LEVER)")
+    else
+        term.setTextColor(colors.lightGray) term.write("Drive Mode: TIMED PULSE (" .. config.openDelay .. "s)")
+    end
+    
+    term.setCursorPos(4, 10)
     term.setBackgroundColor(colors.gray) term.setTextColor(colors.lime)
     term.write("    [ PRESS SPACEBAR TO ACTUATE MATRIX ]   ")
     term.setBackgroundColor(colors.black)
     
     if passModalOpen then
-        drawPanel(5, 11, 42, 5, "SECURITY ENCRYPTION OVERRIDE", colors.red)
-        term.setCursorPos(7, 13) term.setTextColor(colors.white)
+        drawPanel(5, 12, 42, 5, "SECURITY ENCRYPTION OVERRIDE", colors.red)
+        term.setCursorPos(7, 14) term.setTextColor(colors.white)
         term.write("CRYPT-KEY: " .. string.rep("*", #enteredPass))
     end
 end
 
+-- СИНХРОНИЗАЦИЯ С РЕСИВЕРОМ
 if not config.targetId then
     term.clear()
     drawPanel(2, 2, 48, 8, "ESTABLISHING TELEMETRY LINK", colors.lightBlue)
@@ -136,6 +145,7 @@ if not config.targetId then
                 f.writeLine("  modemSide = \"" .. (config.modemSide or "top") .. "\",")
                 f.writeLine("  usePassword = " .. tostring(config.usePassword or false) .. ",")
                 f.writeLine("  correctPassword = \"" .. (config.correctPassword or "1234") .. "\",")
+                f.writeLine("  openDelay = " .. (config.openDelay or 4) .. ",")
                 f.writeLine("  targetId = " .. sid)
                 f.writeLine("}")
                 f.close()
@@ -144,41 +154,54 @@ if not config.targetId then
         end
     end
 end
--- ============================================================
 
 initMonitors()
 drawConsoleUI()
 
+-- УПРАВЛЕНИЕ ЦИКЛОМ ДВЕРИ (ТАЙМЕР ИЛИ РЫЧАГ)
 local function triggerDoorOpening()
-    renderAllMonitors(true)
+    local delay = config.openDelay or 4
     
-    rednet.send(config.targetId, "open")
-    term.setCursorPos(4, 15) term.setTextColor(colors.green) term.write("[TRANSMITTING] VECTOR ACTION ACTIVE.      ")
-    
-    local myTimer = os.startTimer(6)
-    
-    while true do
-        local event, p1, p2 = os.pullEvent()
+    if delay == 0 then
+        -- РЕЖИМ РЫЧАГА (TOGGLE MODE)
+        isDoorOpen = not isDoorOpen
+        renderAllMonitors(isDoorOpen)
         
-        if event == "timer" and p1 == myTimer then
-            term.setCursorPos(4, 15) term.setTextColor(colors.yellow) term.write("[TIMEOUT] NO RESPONSE FROM ACTUATOR.    ")
-            break
+        if isDoorOpen then
+            rednet.send(config.targetId, "open:toggle")
+            term.setCursorPos(4, 16) term.setTextColor(colors.green) term.write("[SIGNAL] GATE LOCK RELEASED (OPEN).     ")
+        else
+            rednet.send(config.targetId, "close")
+            term.setCursorPos(4, 16) term.setTextColor(colors.red) term.write("[SIGNAL] ACTUATOR ENGAGED (CLOSED).     ")
         end
+        sleep(0.5)
+        drawConsoleUI()
+    else
+        -- СТАНДАРТНЫЙ РЕЖИМ С ТАЙМЕРОМ
+        renderAllMonitors(true)
+        rednet.send(config.targetId, "open:" .. delay)
+        term.setCursorPos(4, 16) term.setTextColor(colors.green) term.write("[TRANSMITTING] VECTOR ACTION ACTIVE.      ")
         
-        if event == "rednet_message" and p2 == "done" and p1 == config.targetId then
-            term.setCursorPos(4, 15) term.setTextColor(colors.lime) term.write("[CONFIRMED] TARGET SECTOR CYCLED.       ")
-            break
+        local myTimer = os.startTimer(delay + 2)
+        while true do
+            local event, p1, p2 = os.pullEvent()
+            if event == "timer" and p1 == myTimer then
+                term.setCursorPos(4, 16) term.setTextColor(colors.yellow) term.write("[TIMEOUT] NO RESPONSE FROM ACTUATOR.    ")
+                break
+            end
+            if event == "rednet_message" and p2 == "done" and p1 == config.targetId then
+                term.setCursorPos(4, 16) term.setTextColor(colors.lime) term.write("[CONFIRMED] TARGET SECTOR CYCLED.       ")
+                break
+            end
         end
+        sleep(0.5)
+        renderAllMonitors(false)
+        drawConsoleUI()
     end
-    
-    sleep(0.5)
-    
-    renderAllMonitors(false)
-    drawConsoleUI()
 end
 
 parallel.waitForAny(
-    function()
+    function() -- Клавиатура терминала
         while true do
             local _, key = os.pullEvent("key")
             if key == keys.space and not passModalOpen then
@@ -190,7 +213,7 @@ parallel.waitForAny(
                     if enteredPass == config.correctPassword then
                         passModalOpen = false; drawConsoleUI(); triggerDoorOpening()
                     else
-                        term.setCursorPos(7, 15) term.setTextColor(colors.red) term.write("ACCESS DENIED: CRYPTOKEY INVALID")
+                        term.setCursorPos(7, 16) term.setTextColor(colors.red) term.write("ACCESS DENIED: CRYPTOKEY INVALID")
                         sleep(1.5); passModalOpen = false; drawConsoleUI()
                     end
                 elseif key == keys.backspace then
@@ -224,7 +247,8 @@ parallel.waitForAny(
                 local side = p1
                 if isMonitor(side) then
                     activeMonitors[side] = true
-                    renderSingleMonitor(side, false)
+                    setupMonitorScale(side)
+                    renderSingleMonitor(side, isDoorOpen)
                     drawConsoleUI()
                 end
                 
