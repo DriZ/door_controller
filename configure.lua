@@ -1,10 +1,11 @@
 -- ============================================================
--- DOOR SYSTEM - HARDWARE CONFIGURATOR WIZARD (v2.7)
+-- SCADA DOOR SYSTEM - HARDWARE CONFIGURATOR WIZARD (v2.8)
 -- ============================================================
 
 local term = _G.term
 local colors = _G.colors
 
+-- Загружаем текущий конфиг для сохранения targetId
 local config = {}
 if fs.exists("door/config.lua") then
     local ok, res = pcall(dofile, "door/config.lua")
@@ -16,10 +17,31 @@ local function drawUI(title)
     term.setTextColor(colors.cyan)
     term.clear()
     term.setCursorPos(1, 1)
-    print("===============================================")
-    print("     DOOR SYSTEM - CONFIGURATION WIZARD        ")
-    print("===============================================")
+    print("==================================================")
+    print("     MEKANISM SCADA - CONFIGURATION WIZARD        ")
+    print("==================================================")
     if title then print(" STEP: " .. title) print("--------------------------------------------------") end
+end
+
+-- ФУНКЦИЯ АВТООПРЕДЕЛЕНИЯ МОДЕМА
+local function autoDetectModem()
+    local pList = peripheral.getNames()
+    local foundModems = {}
+    
+    for _, side in ipairs(pList) do
+        -- Ищем как беспроводные, так и проводные модемы
+        local ok, pType = pcall(peripheral.getType, side)
+        if ok and pType == "modem" then
+            table.insert(foundModems, side)
+        end
+    end
+    
+    -- Если нашли ровно один модем — это наш идеальный кандидат
+    if #foundModems == 1 then
+        return foundModems[1]
+    end
+    -- Если модемов нет или их несколько, вернем nil для ручного ввода
+    return nil
 end
 
 drawUI("NODE PROFILE IDENTIFICATION")
@@ -41,17 +63,29 @@ local newConfig = {
     targetId = config.targetId
 }
 
+-- Автоопределение модема для обоих профилей
+local autoModem = autoDetectModem()
+
 if profile == "CONTROLLER" then
+    -- Настройка имени сектора
     drawUI("SECTOR DOMAIN ASSIGNMENT")
     write("Enter custom sector/room name (e.g. Gate Sector A):\n> ")
     local name = read()
     newConfig.roomName = (name ~= "") and name or (config.roomName or "Gate Sector A")
 
+    -- Настройка модема (с автоопределением)
     drawUI("NETWORK UPLINK BUS")
-    write("Enter modem peripheral side (top/bottom/left/right/back):\n> ")
-    local side = read()
-    newConfig.modemSide = (side ~= "") and side:lower() or (config.modemSide or "top")
+    if autoModem then
+        newConfig.modemSide = autoModem
+        print("[+] Automatically mapped modem on side: " .. autoModem:upper())
+        sleep(1.5)
+    else
+        write("Enter modem peripheral side (top/bottom/left/right/back):\n> ")
+        local side = read()
+        newConfig.modemSide = (side ~= "") and side:lower() or (config.modemSide or "top")
+    end
 
+    -- Настройка режима работы кнопки
     drawUI("ACTUATOR DRIVE MODE")
     print("Choose how the door should operate:")
     print("1. [LEVER MODE]  - Toggle switch. Stays open until closed manually.")
@@ -61,18 +95,15 @@ if profile == "CONTROLLER" then
 
     if modeChoice == "1" then
         newConfig.openDelay = 0
-        print("\n[+] Configured as Permanent Toggle Lever.")
     else
         write("\nEnter door open duration in seconds (e.g. 4):\n> ")
         local delayInput = read()
         local delayNum = tonumber(delayInput)
-        -- Защита: если ввели не число или меньше 1, ставим дефолт 4
         if not delayNum or delayNum < 1 then delayNum = 4 end
         newConfig.openDelay = delayNum
-        print("\n[+] Pulse timer locked at: " .. delayNum .. " seconds.")
     end
-    sleep(1.5)
 
+    -- Настройка безопасности
     drawUI("SECURITY ENCRYPTION LAYER")
     write("Enable cryptographic key protection? (y/n):\n> ")
     local usePass = read():lower()
@@ -86,6 +117,7 @@ if profile == "CONTROLLER" then
         newConfig.correctPassword = config.correctPassword or "1234"
     end
 
+    -- Запись
     local f = fs.open("door/config.lua", "w")
     f.writeLine("return {")
     f.writeLine("  profile = \"" .. newConfig.profile .. "\",")
@@ -94,35 +126,34 @@ if profile == "CONTROLLER" then
     f.writeLine("  usePassword = " .. tostring(newConfig.usePassword) .. ",")
     f.writeLine("  correctPassword = \"" .. newConfig.correctPassword .. "\",")
     f.writeLine("  openDelay = " .. newConfig.openDelay .. ",")
-    if newConfig.targetId then
-        f.writeLine("  targetId = " .. newConfig.targetId)
-    else
-        f.writeLine("  targetId = nil")
-    end
+    if newConfig.targetId then f.writeLine("  targetId = " .. newConfig.targetId) else f.writeLine("  targetId = nil") end
     f.writeLine("}")
     f.close()
 
 else
+    -- НАСТРОЙКА ДЛЯ РЕСИВЕРА
     drawUI("RECEIVER HARDWARE MAPPING")
-    write("Enter modem peripheral side (top/bottom/left/right/back):\n> ")
-    local mSide = read()
-    newConfig.modemSide = (mSide ~= "") and mSide:lower() or (config.modemSide or "left")
+    if autoModem then
+        newConfig.modemSide = autoModem
+        print("[+] Automatically mapped modem on side: " .. autoModem:upper())
+        sleep(1)
+    else
+        write("Enter modem peripheral side (top/bottom/left/right/back):\n> ")
+        local mSide = read()
+        newConfig.modemSide = (mSide ~= "") and mSide:lower() or (config.modemSide or "left")
+    end
 
     write("Enter redstone output side connected to the door:\n> ")
     local dSide = read()
     newConfig.doorSide = (dSide ~= "") and dSide:lower() or (config.doorSide or "bottom")
 
-    -- Запись конфигурации ресивера
+    -- Запись
     local f = fs.open("door/config.lua", "w")
     f.writeLine("return {")
     f.writeLine("  profile = \"" .. newConfig.profile .. "\",")
     f.writeLine("  modemSide = \"" .. newConfig.modemSide .. "\",")
     f.writeLine("  doorSide = \"" .. newConfig.doorSide .. "\",")
-    if config.controllerId then
-        f.writeLine("  controllerId = " .. config.controllerId)
-    else
-        f.writeLine("  controllerId = nil")
-    end
+    if config.controllerId then f.writeLine("  controllerId = " .. config.controllerId) else f.writeLine("  controllerId = nil") end
     f.writeLine("}")
     f.close()
 end
@@ -135,8 +166,4 @@ print("--------------------------------------------------")
 write("Press Enter to boot main environment...")
 read()
 
-if profile == "CONTROLLER" then
-    shell.run("door/controller.lua")
-else
-    shell.run("door/receiver.lua")
-end
+if profile == "CONTROLLER" then shell.run("door/controller.lua") else shell.run("door/receiver.lua") end
