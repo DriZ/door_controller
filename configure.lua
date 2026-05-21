@@ -33,7 +33,6 @@ config.modemSide = autoDetectModem()
 local function drawHeader(title)
     term.setBackgroundColor(colors.gray)
     term.clear()
-    -- Рамка
     term.setBackgroundColor(colors.black)
     for i = 2, 18 do
         term.setCursorPos(2, i) term.write(string.rep(" ", 47))
@@ -225,18 +224,34 @@ if (config.profile or "CONTROLLER") == "CONTROLLER" then
     f.writeLine("}")
     f.close()
 else
-    drawHeader("Receiver Actuator Mapping")
-    config.doorSide = config.doorSide or "bottom"
-    term.setCursorPos(4, 6) print("[+] Bound Modem on side: " .. config.modemSide:upper())
-    term.setCursorPos(4, 7) print("[+] Bound Actuator Gate Core on side: " .. config.doorSide:upper())
-    sleep(1.5)
+    drawUI("RECEIVER HARDWARE MAPPING")
     
+    if autoModem then
+        newConfig.modemSide = autoModem
+        print("[+] Automatically mapped modem on side: " .. autoModem:upper())
+        sleep(1)
+    else
+        write("Enter modem peripheral side (top/bottom/left/right/back):\n> ")
+        local mSide = read()
+        newConfig.modemSide = (mSide ~= "") and mSide:lower() or (config.modemSide or "left")
+    end
+
+    print("")
+
+    write("Enter redstone output side connected to the door\n(top/bottom/left/right/back/front):\n> ")
+    local dSide = read()
+    newConfig.doorSide = (dSide ~= "") and dSide:lower() or (config.doorSide or "bottom")
+
     local f = fs.open("door/config.lua", "w")
     f.writeLine("return {")
     f.writeLine("  profile = \"RECEIVER\",")
-    f.writeLine("  modemSide = \"" .. config.modemSide .. "\",")
-    f.writeLine("  doorSide = \"" .. config.doorSide .. "\",")
-    if config.controllerId then f.writeLine("  controllerId = " .. config.controllerId) else f.writeLine("  controllerId = nil") end
+    f.writeLine("  modemSide = \"" .. newConfig.modemSide .. "\",")
+    f.writeLine("  doorSide = \"" .. newConfig.doorSide .. "\",")
+    if config.controllerId then 
+        f.writeLine("  controllerId = " .. config.controllerId) 
+    else 
+        f.writeLine("  controllerId = nil") 
+    end
     f.writeLine("}")
     f.close()
 end
