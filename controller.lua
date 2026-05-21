@@ -1,6 +1,6 @@
--- ====================================
--- DOOR SYSTEM - CONTROLLER MAIN ENGINE
--- ====================================
+-- ========================
+-- DOOR SYSTEM - CONTROLLER
+-- ========================
 
 local term = _G.term
 local colors = _G.colors
@@ -11,6 +11,8 @@ if config.modemSide and config.modemSide ~= "" then pcall(function() rednet.open
 
 local passModalOpen = false
 local enteredPass = ""
+
+local activeMonitors = {}
 
 local function drawPanel(x, y, w, h, title, borderCol)
     term.setTextColor(borderCol or colors.gray)
@@ -24,17 +26,31 @@ local function drawPanel(x, y, w, h, title, borderCol)
     end
 end
 
-local function renderMonitors(active)
-    for monSide, _ in pairs(config.monitors) do
-        local m = peripheral.wrap(monSide)
-        if m then
-            m.setBackgroundColor(active and colors.green or colors.black)
-            m.setTextColor(active and colors.black or colors.lime)
-            m.clear()
-            local w, h = m.getSize()
-            local txt = "[   OPEN GATE   ]"
-            m.setCursorPos(math.floor((w - #txt)/2) + 1, math.floor(h/2) + 1)
-            m.write(txt)
+local function renderSingleMonitor(monSide, active)
+    local m = peripheral.wrap(monSide)
+    if m then
+        m.setBackgroundColor(active and colors.green or colors.black)
+        m.setTextColor(active and colors.black or colors.lime)
+        m.clear()
+        local w, h = m.getSize()
+        local txt = "[   OPEN GATE   ]"
+        m.setCursorPos(math.floor((w - #txt)/2) + 1, math.floor(h/2) + 1)
+        m.write(txt)
+    end
+end
+
+local function renderAllMonitors(active)
+    for monSide, _ in pairs(activeMonitors) do
+        renderSingleMonitor(monSide, active)
+    end
+end
+
+local function initMonitors()
+    activeMonitors = {}
+    for _, side in ipairs(peripheral.getNames()) do
+        if peripheral.getType(side) == "monitor" then
+            activeMonitors[side] = true
+            renderSingleMonitor(side, false)
         end
     end
 end
@@ -46,19 +62,22 @@ local function drawConsoleUI()
     term.setCursorPos(4, 4) term.setTextColor(colors.white) term.write("Sector Domain: " .. config.roomName:upper())
     term.setCursorPos(4, 5) term.write("Uplink Address Node: " .. (config.targetId or "RESOLVING MATRIX..."))
     
-    term.setCursorPos(4, 8)
+    local monCount = 0
+    for _ in pairs(activeMonitors) do monCount = monCount + 1 end
+    term.setCursorPos(4, 6) term.setTextColor(colors.lightBlue) term.write("Active Display Panels: " .. monCount)
+    
+    term.setCursorPos(4, 9)
     term.setBackgroundColor(colors.gray) term.setTextColor(colors.lime)
     term.write("    [ PRESS SPACEBAR TO ACTUATE MATRIX ]   ")
     term.setBackgroundColor(colors.black)
     
     if passModalOpen then
-        drawPanel(5, 10, 42, 6, "SECURITY ENCRYPTION OVERRIDE", colors.red)
-        term.setCursorPos(7, 12) term.setTextColor(colors.white)
+        drawPanel(5, 11, 42, 5, "SECURITY ENCRYPTION OVERRIDE", colors.red)
+        term.setCursorPos(7, 13) term.setTextColor(colors.white)
         term.write("CRYPT-KEY: " .. string.rep("*", #enteredPass))
     end
 end
 
--- СИНХРОНИЗАЦИЯ С РЕСИВЕРОМ
 if not config.targetId then
     term.clear()
     drawPanel(2, 2, 48, 8, "ESTABLISHING TELEMETRY LINK", colors.lightBlue)
@@ -79,29 +98,29 @@ if not config.targetId then
     end
 end
 
-renderMonitors(false)
+initMonitors()
 drawConsoleUI()
 
 local function triggerDoorOpening()
-    renderMonitors(true)
+    renderAllMonitors(true)
     rednet.send(config.targetId, "open")
-    term.setCursorPos(4, 14) term.setTextColor(colors.green) term.write("[TRANSMITTING] VECTOR ACTION ACTIVE.      ")
+    term.setCursorPos(4, 15) term.setTextColor(colors.green) term.write("[TRANSMITTING] VECTOR ACTION ACTIVE.      ")
     
     local timer = os.startTimer(6)
     while true do
         local _, id, msg = os.pullEvent()
         if id == timer then break end
         if id == "rednet_message" and msg == "done" then
-            term.setCursorPos(4, 14) term.setTextColor(colors.lime) term.write("[CONFIRMED] TARGET SECTOR CYCLED.       ")
+            term.setCursorPos(4, 15) term.setTextColor(colors.lime) term.write("[CONFIRMED] TARGET SECTOR CYCLED.       ")
             break
         end
     end
-    renderMonitors(false)
+    renderAllMonitors(false)
     drawConsoleUI()
 end
 
 parallel.waitForAny(
-    function() -- Клавиатура терминала
+    function()
         while true do
             local _, key = os.pullEvent("key")
             if key == keys.space and not passModalOpen then
@@ -113,7 +132,7 @@ parallel.waitForAny(
                     if enteredPass == config.correctPassword then
                         passModalOpen = false; drawConsoleUI(); triggerDoorOpening()
                     else
-                        term.setCursorPos(7, 14) term.setTextColor(colors.red) term.write("ACCESS DENIED: CRYPTOKEY INVALID")
+                        term.setCursorPos(7, 15) term.setTextColor(colors.red) term.write("ACCESS DENIED: CRYPTOKEY INVALID")
                         sleep(1.5); passModalOpen = false; drawConsoleUI()
                     end
                 elseif key == keys.backspace then
@@ -123,19 +142,40 @@ parallel.waitForAny(
             end
         end
     end,
-    function() -- Текстовый буфер пароля
+    
+    function()
         while true do
             local _, char = os.pullEvent("char")
             if passModalOpen then enteredPass = enteredPass .. char; drawConsoleUI() end
         end
     end,
-    function() -- Сенсор внешних мониторов
+    
+    function()
         while true do
-            local _, side, x, y = os.pullEvent("monitor_touch")
-            if config.monitors[side] and not passModalOpen then
-                if config.usePassword then
-                    passModalOpen = true; enteredPass = ""; drawConsoleUI()
-                else triggerDoorOpening() end
+            local event, p1, p2, p3 = os.pullEvent()
+            
+            if event == "monitor_touch" then
+                local side = p1
+                if activeMonitors[side] and not passModalOpen then
+                    if config.usePassword then
+                        passModalOpen = true; enteredPass = ""; drawConsoleUI()
+                    else triggerDoorOpening() end
+                end
+                
+            elseif event == "peripheral" then
+                local side = p1
+                if peripheral.getType(side) == "monitor" then
+                    activeMonitors[side] = true
+                    renderSingleMonitor(side, false)
+                    drawConsoleUI()
+                end
+                
+            elseif event == "peripheral_detach" then
+                local side = p1
+                if activeMonitors[side] then
+                    activeMonitors[side] = nil
+                    drawConsoleUI()
+                end
             end
         end
     end
