@@ -224,21 +224,24 @@ if (config.profile or "CONTROLLER") == "CONTROLLER" then
     f.writeLine("}")
     f.close()
 else
-    drawUI("RECEIVER HARDWARE MAPPING")
+    drawHeader("Receiver Hardware Mapping")
     
     if autoModem then
         newConfig.modemSide = autoModem
+        term.setCursorPos(4, 6) term.setTextColor(colors.lime)
         print("[+] Automatically mapped modem on side: " .. autoModem:upper())
         sleep(1)
     else
+        term.setCursorPos(4, 6) term.setTextColor(colors.white)
         write("Enter modem peripheral side (top/bottom/left/right/back):\n> ")
         local mSide = read()
         newConfig.modemSide = (mSide ~= "") and mSide:lower() or (config.modemSide or "left")
     end
 
-    print("")
-
-    write("Enter redstone output side connected to the door\n(top/bottom/left/right/back/front):\n> ")
+    term.setCursorPos(4, 9) term.setTextColor(colors.white)
+    print("Enter redstone output side connected to the door")
+    term.setCursorPos(4, 10) term.setTextColor(colors.gray)
+    write("(top/bottom/left/right/back/front):\n> ")
     local dSide = read()
     newConfig.doorSide = (dSide ~= "") and dSide:lower() or (config.doorSide or "bottom")
 
