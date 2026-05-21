@@ -88,7 +88,7 @@ mainFrame:addLabel()
     :setForeground(colors.lime)
 
 -- ФИКС: Заменяем addHorizontalBar на обычную тонкую панель-линию
-mainFrame:addPanel()
+mainFrame:addLabel()
     :setPosition(3, 3)
     :setSize(45, 1)
     :setBackground(colors.gray)
