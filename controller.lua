@@ -63,15 +63,25 @@ local function renderAllMonitors(active)
     end
 end
 
--- Безопасное сканирование сети при старте (Исключает stack overflow)
+-- Безопасная проверка: действительно ли устройство является монитором
+local function isMonitor(side)
+    if not side then return false end
+    -- Если в имени уже есть "monitor" (через модем), это точно он
+    if string.find(side:lower(), "monitor") then return true end
+    
+    -- Если имя - это просто сторона (right, top и т.д.), аккуратно проверяем тип
+    local ok, pType = pcall(peripheral.getType, side)
+    return ok and pType == "monitor"
+end
+
+-- Надежное сканирование сети при старте
 local function initMonitors()
     activeMonitors = {}
     local ok, pList = pcall(peripheral.getNames)
     if not ok or not pList then return end
     
     for _, side in ipairs(pList) do
-        -- Защита: смотрим только на имя, не вызывая тяжелый peripheral.getType()
-        if string.find(side:lower(), "monitor") then
+        if isMonitor(side) then
             activeMonitors[side] = true
             renderSingleMonitor(side, false)
         end
@@ -144,7 +154,7 @@ local function triggerDoorOpening()
 end
 
 parallel.waitForAny(
-    function() -- Клавиатура терминала
+    function()
         while true do
             local _, key = os.pullEvent("key")
             if key == keys.space and not passModalOpen then
@@ -167,14 +177,14 @@ parallel.waitForAny(
         end
     end,
     
-    function() -- Текстовый буфер пароля
+    function()
         while true do
             local _, char = os.pullEvent("char")
             if passModalOpen then enteredPass = enteredPass .. char; drawConsoleUI() end
         end
     end,
     
-    function() -- Экранированный менеджер ивентов сети
+    function()
         while true do
             local event, p1, p2, p3 = os.pullEvent()
             
@@ -188,8 +198,7 @@ parallel.waitForAny(
                 
             elseif event == "peripheral" then
                 local side = p1
-                -- Защита: проверяем тип ТОЛЬКО если в имени устройства есть "monitor"
-                if side and string.find(side:lower(), "monitor") then
+                if isMonitor(side) then
                     activeMonitors[side] = true
                     renderSingleMonitor(side, false)
                     drawConsoleUI()
