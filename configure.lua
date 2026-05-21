@@ -1,8 +1,7 @@
 -- ============================================================
--- GateKeeper OS - CONFIGURATOR MASTER WIZARD (BASALT GUI v4.2)
+-- GateKeeper OS - CONFIGURATOR MASTER WIZARD (BASALT v4.3)
 -- ============================================================
 
--- 1. СРАЗУ ЗАГРУЖАЕМ ТЕКУЩИЙ КОНФИГ
 local config = {
     roomName = "Gate Sector A",
     openDelay = 4,
@@ -19,7 +18,6 @@ if fs.exists("door/config.lua") then
     end
 end
 
--- Автоопределение беспроводного модема
 local function autoDetectModem()
     for _, side in ipairs(peripheral.getNames()) do
         local ok, pType = pcall(peripheral.getType, side)
@@ -29,9 +27,6 @@ local function autoDetectModem()
 end
 config.modemSide = autoDetectModem()
 
--- ============================================================
--- ИЗОЛИРОВАННЫЙ БЛОК ДЛЯ РЕСИВЕРА (БЕЗ GUI)
--- ============================================================
 if (config.profile or "CONTROLLER") == "RECEIVER" then
     term.setBackgroundColor(colors.black)
     term.clear()
@@ -60,12 +55,9 @@ if (config.profile or "CONTROLLER") == "RECEIVER" then
     print("\n[+] Receiver registry updated.")
     sleep(1)
     shell.run("door/receiver.lua")
-    return -- Полностью завершаем работу конфигуратора для ресивера
+    return
 end
 
--- ============================================================
--- БЛОК ДЛЯ КОНТРОЛЛЕРА (ЗАПУСКАЕТСЯ ТОЛЬКО НА КОНТРОЛЛЕРЕ)
--- ============================================================
 local basalt
 if fs.exists("door/basalt.lua") then
     if not string.find(package.path, ";/?%.lua") then
@@ -77,68 +69,92 @@ else
     error("Basalt UI framework component is missing! Reinstall via installer.lua")
 end
 
--- Создаём главное окно интерфейса
-local mainFrame = basalt.createFrame():setBackground(colors.darkGray)
+local mainFrame = basalt.createFrame():setBackground(colors.lightGray)
 
--- Заголовок системы
-mainFrame:addLabel()
-    :setPosition(3, 2)
-    :setSize(45, 1)
-    :setText("GateKeeper OS [CONFIGURATION MATRIX]")
-    :setForeground(colors.lime)
-
--- ФИКС: Заменяем addHorizontalBar на обычную тонкую панель-линию
-mainFrame:addLabel()
-    :setPosition(3, 3)
-    :setSize(45, 1)
+local topBar = mainFrame:addFrame()
+    :setPosition(1, 1)
+    :setSize(51, 3)
     :setBackground(colors.gray)
 
--- Под-фреймы страниц
-local step1Frame = mainFrame:addFrame():setPosition(3, 4):setSize(45, 14):setBackground(colors.black)
-local step2Frame = mainFrame:addFrame():setPosition(3, 4):setSize(45, 14):setBackground(colors.black):hide()
+topBar:addLabel()
+    :setPosition(3, 2)
+    :setText("GateKeeper OS // HARDWARE CONTROL SYSTEM")
+    :setForeground(colors.lime)
+
+mainFrame:addLabel()
+    :setPosition(1, 4)
+    :setSize(51, 1)
+    :setText(string.rep("-", 51))
+    :setForeground(colors.gray)
+    :setBackground(colors.lightGray)
+
+local contentFrame = mainFrame:addFrame()
+    :setPosition(2, 5)
+    :setSize(49, 14)
+    :setBackground(colors.gray)
+
+local step1Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(colors.gray)
+local step2Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(colors.gray):hide()
 
 local monitorsList = {}
 
--- ИНИЦИАЛИЗАЦИЯ ШАГА 1
-step1Frame:addLabel():setPosition(2, 2):setText("Sector / Room Domain Name:"):setForeground(colors.white)
+step1Frame:addLabel()
+    :setPosition(3, 2)
+    :setText("SECTOR DOMAIN IDENTIFIER:")
+    :setForeground(colors.lightGray)
+
 local inputRoom = step1Frame:addInput()
-    :setPosition(2, 3)
-    :setSize(30, 1)
-    :setBackground(colors.gray)
-    :setForeground(colors.white)
+    :setPosition(3, 3)
+    :setSize(43, 1)
+    :setBackground(colors.black)
+    :setForeground(colors.cyan)
     :setValue(config.roomName)
 
-step1Frame:addLabel():setPosition(2, 5):setText("Actuator Open Delay (seconds):"):setForeground(colors.white)
+step1Frame:addLabel()
+    :setPosition(3, 5)
+    :setText("ACTUATOR OPEN DELAY (SEC):")
+    :setForeground(colors.lightGray)
+
 local inputDelay = step1Frame:addInput()
-    :setPosition(2, 6)
-    :setSize(8, 1)
-    :setBackground(colors.gray)
-    :setForeground(colors.white)
+    :setPosition(3, 6)
+    :setSize(10, 1)
+    :setBackground(colors.black)
+    :setForeground(colors.orange)
     :setInputType("number")
     :setValue(tostring(config.openDelay))
 
-step1Frame:addLabel():setPosition(12, 6):setText("* 0 = Toggle Lever Mode"):setForeground(colors.yellow)
-
 step1Frame:addLabel()
-    :setPosition(2, 8)
-    :setSize(40, 2)
-    :setText("Lever mode leaves the gate open until you\nmanually click [ CLOSE ] on the display.")
-    :setForeground(colors.lightGray)
+    :setPosition(15, 6)
+    :setText("[ 0 = LEVER TOGGLE MODE ]")
+    :setForeground(colors.yellow)
+
+local infoBox = step1Frame:addFrame()
+    :setPosition(3, 8)
+    :setSize(43, 3)
+    :setBackground(colors.lightGray)
+
+infoBox:addLabel()
+    :setPosition(2, 1)
+    :setSize(41, 2)
+    :setText("Notice: Lever mode maintains active output state\nuntil manually cycled via control matrix.")
+    :setForeground(colors.black)
 
 local btnNext = step1Frame:addButton()
-    :setPosition(32, 12)
-    :setSize(10, 1)
-    :setText("NEXT >")
+    :setPosition(34, 12)
+    :setSize(12, 1)
+    :setText("NEXT STEP >")
     :setBackground(colors.lime)
     :setForeground(colors.black)
 
--- ИНИЦИАЛИЗАЦИЯ ШАГА 2
-step2Frame:addLabel():setPosition(2, 1):setText("Select Display Panel Matrix:"):setForeground(colors.cyan)
+step2Frame:addLabel()
+    :setPosition(3, 1)
+    :setText("PERIPHERAL MONITOR GRID MATRIX:")
+    :setForeground(colors.cyan)
 
 local listWidget = step2Frame:addList()
-    :setPosition(2, 3)
-    :setSize(40, 7)
-    :setBackground(colors.gray)
+    :setPosition(3, 3)
+    :setSize(43, 8)
+    :setBackground(colors.black)
     :setForeground(colors.white)
 
 local function refreshMonitorsList()
@@ -156,8 +172,8 @@ local function refreshMonitorsList()
                 isChecked = config.selectedMonitors[name]
             end
             
-            local checkMark = isChecked and "[*]" or "[ ]"
-            local displayString = string.format("%s %-12s (%s)", checkMark, name, sizeStr)
+            local checkMark = isChecked and "[X]" or "[ ]"
+            local displayString = string.format(" %s  %-14s Node Size: %s", checkMark, name:upper(), sizeStr)
             
             listWidget:addItem(displayString)
             table.insert(monitorsList, { name = name, checked = isChecked, str = displayString })
@@ -171,31 +187,30 @@ listWidget:onClick(function(self, event, button, x, y)
         local item = monitorsList[itemIdx]
         item.checked = not item.checked
         
-        local checkMark = item.checked and "[*]" or "[ ]"
+        local checkMark = item.checked and "[X]" or "[ ]"
         local m = peripheral.wrap(item.name)
         local w, h = m.getSize()
         local sStr = math.ceil(w / 7) .. "x" .. math.ceil(h / 5)
-        item.str = string.format("%s %-12s (%s)", checkMark, item.name, sStr)
+        item.str = string.format(" %s  %-14s Node Size: %s", checkMark, item.name:upper(), sStr)
         
         listWidget:editItem(itemIdx, item.str)
     end
 end)
 
 local btnBack = step2Frame:addButton()
-    :setPosition(2, 12)
-    :setSize(10, 1)
-    :setText("< BACK")
+    :setPosition(3, 12)
+    :setSize(12, 1)
+    :setText("< RETURN")
     :setBackground(colors.red)
     :setForeground(colors.white)
 
 local btnFinish = step2Frame:addButton()
-    :setPosition(32, 12)
-    :setSize(10, 1)
-    :setText("FINISH")
+    :setPosition(34, 12)
+    :setSize(12, 1)
+    :setText("COMMIT Changes")
     :setBackground(colors.green)
     :setForeground(colors.white)
 
--- НАВИГАЦИЯ И СОХРАНЕНИЕ
 btnNext:onClick(function()
     config.roomName = inputRoom:getValue()
     config.openDelay = tonumber(inputDelay:getValue()) or 4
