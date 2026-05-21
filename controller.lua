@@ -29,12 +29,29 @@ end
 local function renderSingleMonitor(monSide, active)
     local m = peripheral.wrap(monSide)
     if m then
+        pcall(function() m.setTextScale(1) end)
+        
         m.setBackgroundColor(active and colors.green or colors.black)
         m.setTextColor(active and colors.black or colors.lime)
         m.clear()
+        
         local w, h = m.getSize()
+        
         local txt = "[   OPEN GATE   ]"
-        m.setCursorPos(math.floor((w - #txt)/2) + 1, math.floor(h/2) + 1)
+        if w < #txt then
+            txt = "[ OPEN ]"
+            if w < #txt then
+                txt = "OPEN"
+            end
+        end
+        
+        local posX = math.floor((w - #txt) / 2) + 1
+        local posY = math.floor(h / 2) + 1
+        
+        if posX < 1 then posX = 1 end
+        if posY < 1 then posY = 1 end
+        
+        m.setCursorPos(posX, posY)
         m.write(txt)
     end
 end
