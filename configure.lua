@@ -2,8 +2,8 @@
 -- GateKeeper OS - CONFIGURATOR MASTER WIZARD (BASALT GUI v4.0)
 -- ============================================================
 
--- Загружаем Basalt и текущий конфиг
-local basalt = require("door/basalt")
+local basalt
+
 local config = {
     roomName = "Gate Sector A",
     openDelay = 4,
@@ -12,6 +12,28 @@ local config = {
     correctPassword = "1234",
     selectedMonitors = {}
 }
+
+if (config.profile or "CONTROLLER") == "CONTROLLER" then
+    -- Проверяем физическое наличие файла
+    if fs.exists("door/basalt.lua") then
+        -- Добавляем корень системы в пути package, чтобы require работал корректно
+        if not string.find(package.path, ";/?%.lua") then
+            package.path = package.path .. ";/?.lua;/door/?.lua"
+        end
+        
+        -- Теперь require("basalt") гарантированно найдет файл в корне или в /door/
+        local ok, res = pcall(require, "basalt")
+        if ok then
+            basalt = res
+        else
+            -- Железобетонный резервный вариант, если package.path заблокирован
+            basalt = dofile("door/basalt.lua")
+        end
+    else
+        error("Basalt UI framework component is missing! Reinstall via installer.lua")
+    end
+end
+
 
 if fs.exists("door/config.lua") then
     local ok, res = pcall(dofile, "door/config.lua")
