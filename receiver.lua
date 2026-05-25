@@ -1,10 +1,22 @@
 -- ============================================================
--- GATEKEEPER OS - WIRELESS ACTUATOR RELAY (AUTO-RECOVERY v3.1)
+-- GATEKEEPER OS - WIRELESS ACTUATOR RELAY (v3.2.0 [GKOS UNIFIED])
 -- ============================================================
 
 local term = _G.term
 local colors = _G.colors
 local keys = _G.keys
+
+local theme = {
+    title = colors.lime,
+    bg = colors.black,
+    border = colors.gray,
+    label = colors.gray,
+    value = colors.white,
+    telemetry = colors.cyan,
+    statusOk = colors.lime,
+    statusWarn = colors.yellow,
+    statusError = colors.red
+}
 
 local config = dofile("door/config.lua")
 
@@ -36,11 +48,11 @@ local function saveConfig()
 end
 
 local function establishLink()
-    term.setBackgroundColor(colors.black) term.clear()
-    drawPanel(2, 2, 48, 10, "ESTABLISHING TELEMETRY LINK", colors.cyan)
-    term.setCursorPos(4, 4) term.setTextColor(colors.white)
-    term.write("Broadcasting beacons via " .. config.modemSide:upper() .. "...")
-    term.setCursorPos(4, 6) term.setTextColor(colors.gray)
+    term.setBackgroundColor(theme.bg) term.clear()
+    drawPanel(2, 2, 48, 10, "[ ESTABLISHING TELEMETRY LINK ]", theme.telemetry)
+    term.setCursorPos(4, 4) term.setTextColor(theme.value)
+    term.write("BROADCASTING BEACONS VIA " .. config.modemSide:upper() .. "...")
+    term.setCursorPos(4, 6) term.setTextColor(theme.label)
     term.write("Awaiting validation packet from Controller...")
     
     local myId = os.getComputerID()
@@ -65,20 +77,20 @@ end
 
 local function mainLifecycle()
     while true do
-        term.setBackgroundColor(colors.black) term.clear()
-        drawPanel(2, 2, 48, 13, "GateKeeper OS NODE INFRASTRUCTURE // ONLINE", colors.green)
-        term.setCursorPos(4, 4) term.setTextColor(colors.white) term.write("Authorized Control Unit ID: " .. tostring(config.controllerId))
-        term.setCursorPos(4, 5) term.write("Actuator Connection Bus: " .. config.doorSide:upper())
+        term.setBackgroundColor(theme.bg) term.clear()
+        drawPanel(2, 2, 48, 13, "[ NODE INFRASTRUCTURE - ONLINE ]", theme.statusOk)
+        term.setCursorPos(4, 4) term.setTextColor(theme.label) term.write("AUTHORIZED CONTROL UNIT ID: ") term.setTextColor(theme.value) term.write(tostring(config.controllerId))
+        term.setCursorPos(4, 5) term.setTextColor(theme.label) term.write("ACTUATOR CONNECTION BUS:    ") term.setTextColor(theme.telemetry) term.write(config.doorSide:upper())
         
         local rsStatus = redstone.getOutput(config.doorSide)
         term.setCursorPos(4, 8)
         if rsStatus then
-            term.setTextColor(colors.lime) term.write("[ METRIC ] OUTPUT BUS ACTIVE (POWER ON)  ")
+            term.setTextColor(theme.statusOk) term.write("[ METRIC ] OUTPUT BUS ACTIVE (POWER ON)  ")
         else
-            term.setTextColor(colors.gray) term.write("[ SYSTEM STATUS ] Idle. Monitoring matrix...")
+            term.setTextColor(theme.label) term.write("[ SYSTEM STATUS ] IDLE. MONITORING MATRIX...")
         end
         
-        term.setCursorPos(4, 11) term.setTextColor(colors.yellow) term.write("[ PRESS SPACEBAR ] To unbind and reset link")
+        term.setCursorPos(4, 11) term.setTextColor(theme.statusWarn) term.write("[ PRESS SPACEBAR ] TO UNBIND AND RESET LINK")
         
         local abort = parallel.waitForAny(
             function()
@@ -93,7 +105,7 @@ local function mainLifecycle()
                             local customDelay = msg:match("^open:(%d+)$")
                             local sleepTime = customDelay and tonumber(customDelay) or 4
                             
-                            term.setCursorPos(4, 8) term.setTextColor(colors.lime) term.write("[ ENGAGED ] INJECTING ENERGY INTO ACTUATORS  ")
+                            term.setCursorPos(4, 8) term.setTextColor(theme.statusOk) term.write("[ ENGAGED ] INJECTING ENERGY INTO ACTUATORS  ")
                             redstone.setOutput(config.doorSide, true)
                             sleep(sleepTime)
                             redstone.setOutput(config.doorSide, false)

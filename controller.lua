@@ -1,10 +1,22 @@
 -- ===========================================================
--- GATEKEEPER OS - CONTROLLER MAIN ENGINE (TOGGLE UPDATE v2.6)
+-- GATEKEEPER OS - CONTROLLER ENGINE (v3.2.0 [GKOS UNIFIED])
 -- ===========================================================
 
 local term = _G.term
 local colors = _G.colors
 local keys = _G.keys
+
+local theme = {
+    title = colors.lime,
+    bg = colors.black,
+    border = colors.gray,
+    label = colors.gray,
+    value = colors.white,
+    telemetry = colors.lightBlue,
+    statusOk = colors.lime,
+    statusWarn = colors.yellow,
+    statusError = colors.red
+}
 
 local config = dofile("door/config.lua")
 if config.modemSide and config.modemSide ~= "" then pcall(function() rednet.open(config.modemSide) end) end
@@ -44,11 +56,11 @@ local function renderSingleMonitor(monSide, active)
     if ok and m then
         local w, h = m.getSize()
         
-        m.setBackgroundColor(active and colors.green or colors.black)
-        m.setTextColor(active and colors.black or colors.lime)
+        m.setBackgroundColor(active and theme.statusOk or theme.bg)
+        m.setTextColor(active and theme.bg or theme.statusOk)
         m.clear()
         
-        local txt = active and "[   CLOSE GATE  ]" or "[   OPEN GATE   ]"
+        local txt = active and "[  CLOSE GATE  ]" or "[  OPEN GATE  ]"
         if w < #txt then
             txt = active and "[ CLOSE ]" or "[ OPEN ]"
             if w < #txt then txt = active and "CLOSE" or "OPEN" end
@@ -99,39 +111,40 @@ local function initMonitors()
 end
 
 local function drawConsoleUI()
-    term.setBackgroundColor(colors.black)
+    term.setBackgroundColor(theme.bg)
     term.clear()
-    drawPanel(2, 2, 48, 16, "ACCESS CONTROL PANEL DEPLOYED", colors.lime)
-    term.setCursorPos(4, 4) term.setTextColor(colors.white) term.write("Sector Domain: " .. (config.roomName or "UNNAMED SECTOR"):upper())
-    term.setCursorPos(4, 5) term.write("Uplink Address Node: " .. (config.targetId or "RESOLVING MATRIX..."))
+    drawPanel(2, 2, 48, 16, "[ ACCESS CONTROL PANEL ]", theme.border)
+    term.setCursorPos(4, 4) term.setTextColor(theme.label) term.write("SECTOR DOMAIN: ") term.setTextColor(theme.value) term.write((config.roomName or "UNNAMED"):upper())
+    term.setCursorPos(4, 5) term.setTextColor(theme.label) term.write("UPLINK NODE:   ") term.setTextColor(theme.telemetry) term.write(tostring(config.targetId or "RESOLVING..."))
     
     local monCount = 0
     for _ in pairs(activeMonitors) do monCount = monCount + 1 end
-    term.setCursorPos(4, 6) term.setTextColor(colors.lightBlue) term.write("Active Display Panels: " .. monCount)
+    term.setCursorPos(4, 6) term.setTextColor(theme.label) term.write("ACTIVE DISPLAYS: ") term.setTextColor(theme.telemetry) term.write(tostring(monCount))
     
     term.setCursorPos(4, 7)
+    term.setTextColor(theme.label) term.write("ACTUATOR MODE: ")
     if (config.openDelay or 4) == 0 then
-        term.setTextColor(colors.yellow) term.write("Drive Mode: TOGGLE SWITCH (LEVER)")
+        term.setTextColor(theme.statusWarn) term.write("TOGGLE (SWITCH)")
     else
-        term.setTextColor(colors.lightGray) term.write("Drive Mode: TIMED PULSE (" .. config.openDelay .. "s)")
+        term.setTextColor(theme.value) term.write("PULSE (" .. config.openDelay .. "s)")
     end
     
     term.setCursorPos(4, 10)
-    term.setBackgroundColor(colors.gray) term.setTextColor(colors.lime)
-    term.write("    [ PRESS SPACEBAR TO ACTUATE MATRIX ]   ")
-    term.setBackgroundColor(colors.black)
+    term.setBackgroundColor(theme.border) term.setTextColor(theme.title)
+    term.write("   [ PRESS SPACEBAR TO ACTUATE SYSTEMS ]   ")
+    term.setBackgroundColor(theme.bg)
     
     if passModalOpen then
-        drawPanel(5, 12, 42, 5, "SECURITY ENCRYPTION OVERRIDE", colors.red)
-        term.setCursorPos(7, 14) term.setTextColor(colors.white)
+        drawPanel(5, 12, 42, 5, "[ SECURITY ENCRYPTION ]", theme.statusError)
+        term.setCursorPos(7, 14) term.setTextColor(theme.value)
         term.write("CRYPT-KEY: " .. string.rep("*", #enteredPass))
     end
 end
 
 if not config.targetId then
     term.clear()
-    drawPanel(2, 2, 48, 8, "ESTABLISHING TELEMETRY LINK", colors.lightBlue)
-    term.setCursorPos(4, 4) term.setTextColor(colors.white) term.write("Awaiting handshakes from relay sub-nodes...")
+    drawPanel(2, 2, 48, 8, "[ TELEMETRY LINK ]", theme.telemetry)
+    term.setCursorPos(4, 4) term.setTextColor(theme.value) term.write("Awaiting handshakes from relay sub-nodes...")
     while true do
         local sid, msg = rednet.receive(4)
         if type(msg) == "string" then
@@ -169,27 +182,27 @@ local function triggerDoorOpening()
         
         if isDoorOpen then
             rednet.send(config.targetId, "open:toggle")
-            term.setCursorPos(4, 16) term.setTextColor(colors.green) term.write("[SIGNAL] GATE LOCK RELEASED (OPEN).     ")
+            term.setCursorPos(4, 16) term.setTextColor(theme.statusOk) term.write("[SIGNAL] GATE LOCK RELEASED (OPEN).     ")
         else
             rednet.send(config.targetId, "close")
-            term.setCursorPos(4, 16) term.setTextColor(colors.red) term.write("[SIGNAL] ACTUATOR ENGAGED (CLOSED).     ")
+            term.setCursorPos(4, 16) term.setTextColor(theme.statusError) term.write("[SIGNAL] ACTUATOR ENGAGED (CLOSED).     ")
         end
         sleep(0.5)
         drawConsoleUI()
     else
         renderAllMonitors(true)
         rednet.send(config.targetId, "open:" .. delay)
-        term.setCursorPos(4, 16) term.setTextColor(colors.green) term.write("[TRANSMITTING] VECTOR ACTION ACTIVE.      ")
+        term.setCursorPos(4, 16) term.setTextColor(theme.statusOk) term.write("[TRANSMITTING] VECTOR ACTION ACTIVE.      ")
         
         local myTimer = os.startTimer(delay + 2)
         while true do
             local event, p1, p2 = os.pullEvent()
             if event == "timer" and p1 == myTimer then
-                term.setCursorPos(4, 16) term.setTextColor(colors.yellow) term.write("[TIMEOUT] NO RESPONSE FROM ACTUATOR.    ")
+                term.setCursorPos(4, 16) term.setTextColor(theme.statusWarn) term.write("[TIMEOUT] NO RESPONSE FROM ACTUATOR.    ")
                 break
             end
             if event == "rednet_message" and p2 == "done" and p1 == config.targetId then
-                term.setCursorPos(4, 16) term.setTextColor(colors.lime) term.write("[CONFIRMED] TARGET SECTOR CYCLED.       ")
+                term.setCursorPos(4, 16) term.setTextColor(theme.statusOk) term.write("[CONFIRMED] TARGET SECTOR CYCLED.       ")
                 break
             end
         end

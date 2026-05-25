@@ -1,14 +1,26 @@
 -- ============================================================
--- GateKeeper OS - CONFIGURATOR MASTER WIZARD (BASALT v4.3)
+-- GATEKEEPER OS - CONFIGURATOR ENGINE (v3.2.0 [GKOS UNIFIED])
 -- ============================================================
 
 local config = {
-    roomName = "Gate Sector A",
+    roomName = "GATE SECTOR A",
     openDelay = 4,
     modemSide = "top",
     usePassword = false,
     correctPassword = "1234",
     selectedMonitors = {}
+}
+
+local theme = {
+    title = colors.lime,
+    bg = colors.black,
+    border = colors.gray,
+    label = colors.gray,
+    value = colors.white,
+    telemetry = colors.lightBlue,
+    statusOk = colors.lime,
+    statusWarn = colors.yellow,
+    statusError = colors.red
 }
 
 if fs.exists("door/config.lua") then
@@ -28,16 +40,19 @@ end
 config.modemSide = autoDetectModem()
 
 if (config.profile or "CONTROLLER") == "RECEIVER" then
-    term.setBackgroundColor(colors.black)
+    term.setBackgroundColor(theme.bg)
     term.clear()
     term.setCursorPos(1, 1)
+    term.setTextColor(theme.title)
     print("==================================================")
-    print("      GateKeeper OS [RECEIVER CONFIGURATION]      ")
+    print("   [ GATEKEEPER OS - RECEIVER CONFIGURATION ]     ")
     print("==================================================")
     
     config.doorSide = config.doorSide or "bottom"
+    term.setTextColor(theme.statusOk)
     print("\n[+] Bound Modem on side: " .. config.modemSide:upper())
     
+    term.setTextColor(theme.label)
     print("\nEnter redstone output side connected to the door")
     write("(top/bottom/left/right/back/front):\n> ")
     local dSide = read()
@@ -58,104 +73,98 @@ if (config.profile or "CONTROLLER") == "RECEIVER" then
     return
 end
 
-local basalt
-if fs.exists("door/basalt.lua") then
-    if not string.find(package.path, ";/?%.lua") then
-        package.path = package.path .. ";/?.lua;/door/?.lua"
-    end
-    local ok, res = pcall(require, "basalt")
-    if ok then basalt = res else basalt = dofile("door/basalt.lua") end
-else
-    error("Basalt UI framework component is missing! Reinstall via installer.lua")
-end
+-- Unified Basalt loading logic
+if not package.path:find(";/%?.lua") then package.path = package.path .. ";/?.lua" end
+local ok, basalt = pcall(require, "basalt")
+if not ok then error("GKOS Error: Basalt UI framework not found. Please run 'gkos install' first.") end
 
-local mainFrame = basalt.createFrame():setBackground(colors.lightGray)
+local mainFrame = basalt.createFrame():setBackground(theme.bg)
 
 local topBar = mainFrame:addFrame()
     :setPosition(1, 1)
     :setSize(51, 3)
-    :setBackground(colors.gray)
+    :setBackground(theme.border)
 
 topBar:addLabel()
-    :setPosition(3, 2)
-    :setText("GateKeeper OS // HARDWARE CONTROL SYSTEM")
-    :setForeground(colors.lime)
+    :setPosition(4, 2)
+    :setText("[ GATEKEEPER OS - HARDWARE CONFIGURATION ]")
+    :setForeground(theme.title)
 
 mainFrame:addLabel()
     :setPosition(1, 4)
     :setSize(51, 1)
     :setText(string.rep("-", 51))
-    :setForeground(colors.gray)
-    :setBackground(colors.lightGray)
+    :setForeground(theme.border)
+    :setBackground(theme.bg)
 
 local contentFrame = mainFrame:addFrame()
     :setPosition(2, 5)
     :setSize(49, 14)
-    :setBackground(colors.gray)
+    :setBackground(theme.bg)
 
-local step1Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(colors.gray)
-local step2Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(colors.gray):hide()
+local step1Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(theme.bg)
+local step2Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(theme.bg):hide()
 
 local monitorsList = {}
 
 step1Frame:addLabel()
     :setPosition(3, 2)
     :setText("SECTOR DOMAIN IDENTIFIER:")
-    :setForeground(colors.lightGray)
+    :setForeground(theme.label)
 
 local inputRoom = step1Frame:addInput()
     :setPosition(3, 3)
     :setSize(43, 1)
     :setBackground(colors.black)
-    :setForeground(colors.cyan)
+    :setForeground(theme.telemetry)
     :setValue(config.roomName)
 
 step1Frame:addLabel()
     :setPosition(3, 5)
     :setText("ACTUATOR OPEN DELAY (SEC):")
-    :setForeground(colors.lightGray)
+    :setForeground(theme.label)
 
 local inputDelay = step1Frame:addInput()
     :setPosition(3, 6)
     :setSize(10, 1)
     :setBackground(colors.black)
-    :setForeground(colors.orange)
+    :setForeground(theme.statusWarn)
     :setInputType("number")
     :setValue(tostring(config.openDelay))
 
 step1Frame:addLabel()
     :setPosition(15, 6)
     :setText("[ 0 = LEVER TOGGLE MODE ]")
-    :setForeground(colors.yellow)
+    :setForeground(theme.statusWarn)
 
 local infoBox = step1Frame:addFrame()
     :setPosition(3, 8)
     :setSize(43, 3)
-    :setBackground(colors.lightGray)
+    :setBackground(theme.border)
 
 infoBox:addLabel()
     :setPosition(2, 1)
     :setSize(41, 2)
     :setText("Notice: Lever mode maintains active output state\nuntil manually cycled via control matrix.")
-    :setForeground(colors.black)
+    :setForeground(theme.bg)
 
 local btnNext = step1Frame:addButton()
     :setPosition(34, 12)
     :setSize(12, 1)
-    :setText("NEXT STEP >")
-    :setBackground(colors.lime)
-    :setForeground(colors.black)
+    :setText("[ NEXT STEP ]")
+    :setBackground(theme.statusOk)
+    :setForeground(theme.bg)
 
 step2Frame:addLabel()
     :setPosition(3, 1)
     :setText("PERIPHERAL MONITOR GRID MATRIX:")
-    :setForeground(colors.cyan)
+    :setForeground(theme.telemetry)
 
 local listWidget = step2Frame:addList()
     :setPosition(3, 3)
     :setSize(43, 8)
     :setBackground(colors.black)
-    :setForeground(colors.white)
+    :setForeground(theme.value)
 
 local function refreshMonitorsList()
     listWidget:clear()
@@ -200,16 +209,16 @@ end)
 local btnBack = step2Frame:addButton()
     :setPosition(3, 12)
     :setSize(12, 1)
-    :setText("< RETURN")
-    :setBackground(colors.red)
+    :setText("[ RETURN ]")
+    :setBackground(theme.statusError)
     :setForeground(colors.white)
 
 local btnFinish = step2Frame:addButton()
     :setPosition(34, 12)
     :setSize(12, 1)
-    :setText("COMMIT Changes")
-    :setBackground(colors.green)
-    :setForeground(colors.white)
+    :setText("[ COMMIT ]")
+    :setBackground(theme.statusOk)
+    :setForeground(theme.bg)
 
 btnNext:onClick(function()
     config.roomName = inputRoom:getValue()
