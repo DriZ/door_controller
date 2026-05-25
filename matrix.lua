@@ -1,6 +1,6 @@
-local VERSION = "3.3.13"
+local VERSION = "3.3.14"
 -- ==========================================
--- MATRIX MONITOR V3.3.13 [GKOS UNIFIED]
+-- MATRIX MONITOR V3.3.14 [GKOS UNIFIED]
 -- ==========================================
 
 if term.setPaletteColor then 
