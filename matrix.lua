@@ -34,7 +34,7 @@ if peripheral.getType("top") == "monitor" then
 end
 
 -- Basalt is now managed by the GKOS installer and is expected to be in /basalt.lua
-local basalt = dofile("/basalt.lua")
+local basalt = require("basalt")
 
 local CONFIG_FILE = "config.lua"
 local config = {}
