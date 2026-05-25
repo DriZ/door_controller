@@ -300,7 +300,7 @@ local versionLabel = menuFrame:addLabel({x = screenW - #VERSION, y = 1})
 local function checkForUpdates()
     if not http then return end
     basalt.schedule(function()
-        local res = http.get("https://raw.githubusercontent.com/DriZ/GateKeeperOS/main/matrix.lua")
+        local res = http.get("https://raw.githubusercontent.com/DriZ/GateKeeperOS/main/installer.lua")
         if res then
             local content = res.readAll()
             res.close()
