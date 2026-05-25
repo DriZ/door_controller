@@ -33,24 +33,8 @@ if peripheral.getType("top") == "monitor" then
     monitor.clear()
 end
 
-local function setupBasalt()
-    local ok, lib = pcall(require, "basalt")
-    if ok then return lib end
-
-    if not fs.exists("/basalt.lua") then
-        print("Basalt library not found. Attempting auto-install...")
-        if not http then
-            error("HTTP API is disabled! Enable it in the ComputerCraft config to auto-install Basalt.")
-        end
-        local success = shell.run("wget", "run", "https://raw.githubusercontent.com/Pyroxenium/Basalt2/main/install.lua", "-r", "/basalt.lua")
-        
-        if success then return dofile("/basalt.lua") end
-        error("Failed to download Basalt.")
-    end
-    return dofile("/basalt.lua")
-end
-
-local basalt = setupBasalt()
+-- Basalt is now managed by the GKOS installer and is expected to be in /basalt.lua
+local basalt = dofile("/basalt.lua")
 
 local CONFIG_FILE = "config.lua"
 local config = {}
