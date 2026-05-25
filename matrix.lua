@@ -1,4 +1,4 @@
-local VERSION = "3.3.4"
+local VERSION = "3.3.3"
 -- ==========================================
 -- MATRIX MONITOR V3.3.3 [GKOS UNIFIED]
 -- ==========================================
@@ -300,13 +300,14 @@ local versionLabel = menuFrame:addLabel({x = screenW - #VERSION, y = 1})
 local function checkForUpdates()
     if not http then return end
     basalt.schedule(function()
-        local res = http.get("https://raw.githubusercontent.com/DriZ/GateKeeperOS/main/versions.lua")
+        -- Запрашиваем актуальный gui.lua напрямую
+        local res = http.get("https://raw.githubusercontent.com/DriZ/GateKeeperOS/main/matrix.lua")
         if res then
             local content = res.readAll()
             res.close()
-            local ok, versions = pcall(textutils.unserialize, content)
-            if ok and versions and versions.matrix and versions.matrix ~= VERSION then
-                versionLabel:setForeground(colors.yellow) -- Update available
+            local remoteVer = content:match('local VERSION%s*=%s*"([^"]+)"')
+            if remoteVer and remoteVer ~= VERSION then
+                versionLabel:setForeground(colors.yellow)
             end
         end
     end)
