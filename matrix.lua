@@ -42,16 +42,10 @@ local function setupBasalt()
         if not http then
             error("HTTP API is disabled! Enable it in the ComputerCraft config to auto-install Basalt.")
         end
-        local response = http.get("wget", "run", "https://raw.githubusercontent.com/Pyroxenium/Basalt2/main/install.lua", "-r", "basalt.lua")
-        if response then
-            local file = fs.open("basalt.lua", "w")
-            file.write(response.readAll())
-            file.close()
-            response.close()
-            print("Basalt installed successfully.")
-        else
-            error("Failed to download Basalt. Check your internet connection or install it manually.")
-        end
+        local success = shell.run("wget", "run", "https://raw.githubusercontent.com/Pyroxenium/Basalt2/main/install.lua", "-r", "basalt.lua")
+        
+        if success then return require("basalt") end
+        error("Failed to download Basalt.")
     end
     return require("basalt")
 end
