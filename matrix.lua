@@ -1,6 +1,6 @@
-local VERSION = "3.3.1"
+local VERSION = "3.3.2"
 -- ==========================================
--- MATRIX MONITOR V3.3.1 [GKOS UNIFIED]
+-- MATRIX MONITOR V3.3.2 [GKOS UNIFIED]
 -- ==========================================
 
 if term.setPaletteColor then 
@@ -300,7 +300,7 @@ local versionLabel = menuFrame:addLabel({x = screenW - #VERSION, y = 1})
 local function checkForUpdates()
     if not http then return end
     basalt.schedule(function()
-        local res = http.get("https://raw.githubusercontent.com/DriZ/GateKeeperOS/main/installer.lua")
+        local res = http.get("https://raw.githubusercontent.com/DriZ/GateKeeperOS/main/matrix.lua")
         if res then
             local content = res.readAll()
             res.close()
