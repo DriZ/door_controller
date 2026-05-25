@@ -1,5 +1,6 @@
+local VERSION = "3.3.0"
 -- ============================================================
--- GATEKEEPER OS - WIRELESS ACTUATOR RELAY (v3.2.0 [GKOS UNIFIED])
+-- GATEKEEPER OS - WIRELESS ACTUATOR RELAY (v3.3.0 [GKOS UNIFIED])
 -- ============================================================
 
 local term = _G.term

@@ -1,5 +1,6 @@
+local VERSION = "3.3.0"
 -- ===========================================================
--- GATEKEEPER OS - CONTROLLER ENGINE (v3.2.0 [GKOS UNIFIED])
+-- GATEKEEPER OS - CONTROLLER ENGINE (v3.3.0 [GKOS UNIFIED])
 -- ===========================================================
 
 local term = _G.term

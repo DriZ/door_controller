@@ -1,5 +1,6 @@
+local VERSION = "3.3.0"
 -- ==========================================
--- MATRIX MONITOR V3.2.07
+-- MATRIX MONITOR V3.3.0 [GKOS UNIFIED]
 -- ==========================================
 
 if term.setPaletteColor then 
@@ -404,7 +405,7 @@ buildMainMenu = function()
             btnDel:onClick(function(self)
                 if self:getText() == "DEL " then
                     self:setText("SURE?")
-                    basalt.schedule(function() os.sleep(2) if self.setText then self:setText("DEL ") end end)()
+                    basalt.schedule(function() os.sleep(2) if self.setText then self:setText("DEL ") end end)
                 else
                     config[monName] = nil
                     saveConfig()

@@ -1,5 +1,6 @@
+local VERSION = "3.3.0"
 -- ============================================================
--- GATEKEEPER OS - CONFIGURATOR ENGINE (v3.2.0 [GKOS UNIFIED])
+-- GATEKEEPER OS - CONFIGURATOR ENGINE (v3.3.0 [GKOS UNIFIED])
 -- ============================================================
 
 local config = {
@@ -78,7 +79,7 @@ if not package.path:find(";/%?.lua") then package.path = package.path .. ";/?.lu
 local ok, basalt = pcall(require, "basalt")
 if not ok then error("GKOS Error: Basalt UI framework not found. Please run 'gkos install' first.") end
 
-local mainFrame = basalt.createFrame():setBackground(theme.bg)
+local mainFrame = basalt.getMainFrame():setBackground(theme.bg)
 
 local topBar = mainFrame:addFrame()
     :setPosition(1, 1)
@@ -103,7 +104,7 @@ local contentFrame = mainFrame:addFrame()
     :setBackground(theme.bg)
 
 local step1Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(theme.bg)
-local step2Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(theme.bg):hide()
+local step2Frame = contentFrame:addFrame():setPosition(1, 1):setSize(49, 14):setBackground(theme.bg):setVisible(false)
 
 local monitorsList = {}
 
@@ -223,14 +224,14 @@ local btnFinish = step2Frame:addButton()
 btnNext:onClick(function()
     config.roomName = inputRoom:getValue()
     config.openDelay = tonumber(inputDelay:getValue()) or 4
-    step1Frame:hide()
+    step1Frame:setVisible(false)
     refreshMonitorsList()
-    step2Frame:show()
+    step2Frame:setVisible(true)
 end)
 
 btnBack:onClick(function()
-    step2Frame:hide()
-    step1Frame:show()
+    step2Frame:setVisible(false)
+    step1Frame:setVisible(true)
 end)
 
 btnFinish:onClick(function()
@@ -261,4 +262,4 @@ btnFinish:onClick(function()
     shell.run("door/controller.lua")
 end)
 
-basalt.autoUpdate()
+basalt.run()
