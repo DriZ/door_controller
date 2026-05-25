@@ -1,6 +1,6 @@
-local VERSION = "3.3.10"
+local VERSION = "3.3.11"
 -- ==========================================
--- MATRIX MONITOR V3.3.10 [GKOS UNIFIED]
+-- MATRIX MONITOR V3.3.11 [GKOS UNIFIED]
 -- ==========================================
 
 if term.setPaletteColor then 
@@ -315,6 +315,19 @@ versionLabel:onClick(function()
     end
 end)
 
+local function isNewer(vCurrent, vRemote)
+    local p1 = {}
+    for part in vCurrent:gmatch("%d+") do table.insert(p1, tonumber(part)) end
+    local p2 = {}
+    for part in vRemote:gmatch("%d+") do table.insert(p2, tonumber(part)) end
+    for i = 1, math.max(#p1, #p2) do
+        local n1, n2 = p1[i] or 0, p2[i] or 0
+        if n2 > n1 then return true end
+        if n1 > n2 then return false end
+    end
+    return false
+end
+
 local function checkForUpdates()
     if not http then return end
     basalt.schedule(function()
@@ -323,7 +336,7 @@ local function checkForUpdates()
             local content = res.readAll()
             res.close()
             local remoteVer = content:match('local VERSION%s*=%s*"([^"]+)"')
-            if remoteVer and remoteVer ~= VERSION then
+            if remoteVer and isNewer(VERSION, remoteVer) then
                 updateAvailable = true
                 versionLabel:setForeground(colors.yellow)
             end
