@@ -293,6 +293,25 @@ menuFrame:addLabel({x = math.floor((screenW - #title) / 2) + 1, y = 1})
     :setText(title)
     :setForeground(theme.title)
 
+local versionLabel = menuFrame:addLabel({x = screenW - #VERSION, y = 1})
+    :setText("V" .. VERSION)
+    :setForeground(colors.lightGray)
+
+local function checkForUpdates()
+    if not http then return end
+    basalt.schedule(function()
+        local res = http.get("https://raw.githubusercontent.com/DriZ/GateKeeperOS/main/installer.lua")
+        if res then
+            local content = res.readAll()
+            res.close()
+            local remoteVer = content:match('matrix%s*=%s*"([^"]+)"')
+            if remoteVer and remoteVer ~= VERSION then
+                versionLabel:setForeground(colors.yellow)
+            end
+        end
+    end)
+end
+
 local listContainer
 local scrollBarMain
 
@@ -817,5 +836,6 @@ end)
 loadConfig()
 refreshAllMonitors()
 buildMainMenu()
+checkForUpdates()
 
 basalt.run()
