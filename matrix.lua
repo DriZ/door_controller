@@ -1,6 +1,6 @@
-local VERSION = "3.3.11"
+local VERSION = "3.3.12"
 -- ==========================================
--- MATRIX MONITOR V3.3.11 [GKOS UNIFIED]
+-- MATRIX MONITOR V3.3.12 [GKOS UNIFIED]
 -- ==========================================
 
 if term.setPaletteColor then 
@@ -293,6 +293,7 @@ menuFrame:addLabel({x = math.floor((screenW - #title) / 2) + 1, y = 1})
     :setText(title)
     :setForeground(theme.title)
 
+local updateRequested = false
 local updateAvailable = false
 local versionLabel = menuFrame:addButton({x = screenW - #VERSION, y = 1, width = #VERSION + 1, height = 1})
     :setText("V" .. VERSION)
@@ -301,17 +302,8 @@ local versionLabel = menuFrame:addButton({x = screenW - #VERSION, y = 1, width =
 
 versionLabel:onClick(function()
     if updateAvailable then
+        updateRequested = true
         basalt.stop()
-        term.setBackgroundColor(colors.black)
-        term.setTextColor(colors.white)
-        term.clear()
-        term.setCursorPos(1, 1)
-        print("[ GKOS AUTO-UPDATE ]")
-        print("Updating Matrix Monitor to the latest version...")
-        shell.run("gkos", "update", "matrix")
-        print("\nUpdate complete. Rebooting software...")
-        sleep(1)
-        shell.run(shell.getRunningProgram())
     end
 end)
 
@@ -871,3 +863,23 @@ buildMainMenu()
 checkForUpdates()
 
 basalt.run()
+
+if updateRequested then
+    term.setBackgroundColor(colors.black)
+    term.setTextColor(colors.white)
+    term.clear()
+    term.setCursorPos(1, 1)
+    print("[ GKOS AUTO-UPDATE ]")
+    print("Updating Matrix Monitor to the latest version...")
+    -- Используем абсолютный путь /gkos.lua для надежности
+    if shell.run("/gkos.lua", "update", "matrix") then
+        print("\nUpdate complete. Rebooting software...")
+        sleep(1)
+        shell.run(shell.getRunningProgram())
+    else
+        print("\n[!] Error: Installer '/gkos.lua' not found.")
+        print("Please ensure the installer is named 'gkos.lua' in the root directory.")
+        sleep(3)
+        shell.run(shell.getRunningProgram())
+    end
+end
