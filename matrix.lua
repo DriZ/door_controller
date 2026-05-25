@@ -1,6 +1,6 @@
-local VERSION = "3.3.8"
+local VERSION = "3.3.9"
 -- ==========================================
--- MATRIX MONITOR V3.3.8 [GKOS UNIFIED]
+-- MATRIX MONITOR V3.3.9 [GKOS UNIFIED]
 -- ==========================================
 
 if term.setPaletteColor then 
@@ -293,9 +293,27 @@ menuFrame:addLabel({x = math.floor((screenW - #title) / 2) + 1, y = 1})
     :setText(title)
     :setForeground(theme.title)
 
-local versionLabel = menuFrame:addLabel({x = screenW - #VERSION, y = 1})
+local updateAvailable = false
+local versionLabel = menuFrame:addButton({x = screenW - #VERSION, y = 1, width = #VERSION + 1, height = 1})
     :setText("V" .. VERSION)
+    :setBackground(theme.bg)
     :setForeground(colors.lightGray)
+
+versionLabel:onClick(function()
+    if updateAvailable then
+        basalt.stop()
+        term.setBackgroundColor(colors.black)
+        term.setTextColor(colors.white)
+        term.clear()
+        term.setCursorPos(1, 1)
+        print("[ GKOS AUTO-UPDATE ]")
+        print("Updating Matrix Monitor to the latest version...")
+        shell.run("gkos", "update", "matrix")
+        print("\nUpdate complete. Rebooting software...")
+        sleep(1)
+        shell.run(shell.getRunningProgram())
+    end
+end)
 
 local function checkForUpdates()
     if not http then return end
@@ -306,6 +324,7 @@ local function checkForUpdates()
             res.close()
             local remoteVer = content:match('local VERSION%s*=%s*"([^"]+)"')
             if remoteVer and remoteVer ~= VERSION then
+                updateAvailable = true
                 versionLabel:setForeground(colors.yellow)
             end
         end
