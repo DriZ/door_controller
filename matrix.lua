@@ -1,5 +1,5 @@
 -- ==========================================
--- MATRIX MONITOR V3.2.06
+-- MATRIX MONITOR V3.2.07
 -- ==========================================
 
 if term.setPaletteColor then 
@@ -42,7 +42,7 @@ local function setupBasalt()
         if not http then
             error("HTTP API is disabled! Enable it in the ComputerCraft config to auto-install Basalt.")
         end
-        local response = http.get("https://raw.githubusercontent.com/Pyroxenium/Basalt2/main/install.lua")
+        local response = http.get("wget", "run", "https://raw.githubusercontent.com/Pyroxenium/Basalt2/main/install.lua", "-r", "basalt.lua")
         if response then
             local file = fs.open("basalt.lua", "w")
             file.write(response.readAll())
