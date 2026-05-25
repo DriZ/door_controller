@@ -330,7 +330,7 @@ local function checkForUpdates()
             local remoteVer = content:match('local VERSION%s*=%s*"([^"]+)"')
             if remoteVer and isNewer(VERSION, remoteVer) then
                 updateAvailable = true
-                versionLabel:setForeground(colors.yellow)
+                versionLabel:setForeground(colors.white):setBackground(colors.yellow)
             end
         end
     end)
@@ -871,14 +871,19 @@ if updateRequested then
     term.setCursorPos(1, 1)
     print("[ GKOS AUTO-UPDATE ]")
     print("Updating Matrix Monitor to the latest version...")
-    -- Используем абсолютный путь /gkos.lua для надежности
-    if shell.run("/gkos.lua", "update", "matrix") then
+
+    -- Ищем инсталлер в корне (с расширением или без)
+    local installer = fs.exists("/gkos.lua") and "/gkos.lua" or (fs.exists("/gkos") and "/gkos")
+    if installer and shell.run(installer, "update", "matrix") then
         print("\nUpdate complete. Rebooting software...")
         sleep(1)
         shell.run(shell.getRunningProgram())
     else
-        print("\n[!] Error: Installer '/gkos.lua' not found.")
-        print("Please ensure the installer is named 'gkos.lua' in the root directory.")
+        if not installer then
+            print("\n[!] Error: Installer 'gkos' not found in root.")
+        else
+            print("\n[!] Error: Update process failed.")
+        end
         sleep(3)
         shell.run(shell.getRunningProgram())
     end
